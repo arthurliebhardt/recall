@@ -6,6 +6,9 @@ struct TranscriptionDetailView: View {
     @State private var audioPlayer = AudioPlayerService()
     @State private var isScrubbing = false
     @State private var scrubTime: TimeInterval = 0
+    @State private var editingSegmentId: UUID?
+    @State private var editingSpeakerLabel: String?
+    @State private var editText = ""
 
     private var playbackTime: TimeInterval {
         isScrubbing ? scrubTime : audioPlayer.currentTime
@@ -78,6 +81,9 @@ struct TranscriptionDetailView: View {
                                         segment: segment,
                                         isActive: isActive,
                                         playbackTime: isPlaybackActive ? playbackTime : nil,
+                                        speakerNames: record.speakerNames,
+                                        isEditing: editingSegmentId == segment.id,
+                                        editText: $editText,
                                         onWordTap: { word in
                                             audioPlayer.ensureLoaded(record)
                                             audioPlayer.seek(to: word.startTime)
@@ -91,6 +97,22 @@ struct TranscriptionDetailView: View {
                                             if !audioPlayer.isPlaying {
                                                 audioPlayer.play()
                                             }
+                                        },
+                                        onDoubleClickSpeaker: { originalLabel in
+                                            editingSegmentId = segment.id
+                                            editingSpeakerLabel = originalLabel
+                                            editText = record.displayNameForSpeaker(originalLabel)
+                                        },
+                                        onCommitRename: {
+                                            if let label = editingSpeakerLabel {
+                                                record.renameSpeaker(from: label, to: editText)
+                                            }
+                                            editingSegmentId = nil
+                                            editingSpeakerLabel = nil
+                                        },
+                                        onCancelRename: {
+                                            editingSegmentId = nil
+                                            editingSpeakerLabel = nil
                                         }
                                     )
                                     .id(segment.id)
@@ -243,20 +265,48 @@ private struct SegmentRow: View {
     let segment: TranscriptionSegment
     let isActive: Bool
     let playbackTime: TimeInterval?
+    let speakerNames: [String: String]
+    let isEditing: Bool
+    @Binding var editText: String
     let onWordTap: (TranscriptionWord) -> Void
     let onTimestampTap: () -> Void
+    let onDoubleClickSpeaker: (String) -> Void
+    let onCommitRename: () -> Void
+    let onCancelRename: () -> Void
+
+    @FocusState private var isFieldFocused: Bool
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             // Speaker pill
             if let label = segment.speakerLabel, let color = colorForSpeaker(label) {
-                Text(label)
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(color)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(color.opacity(0.12), in: Capsule())
-                    .frame(width: 80, alignment: .leading)
+                if isEditing {
+                    TextField("Name", text: $editText)
+                        .font(.caption2.weight(.semibold))
+                        .textFieldStyle(.plain)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 2)
+                        .background(color.opacity(0.12), in: Capsule())
+                        .frame(width: 80, alignment: .leading)
+                        .focused($isFieldFocused)
+                        .onAppear { isFieldFocused = true }
+                        .onSubmit { onCommitRename() }
+                        .onExitCommand { onCancelRename() }
+                        .onChange(of: isFieldFocused) { _, focused in
+                            if !focused { onCommitRename() }
+                        }
+                } else {
+                    let displayName = speakerNames[label] ?? label
+                    Text(displayName)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(color)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(color.opacity(0.12), in: Capsule())
+                        .frame(width: 80, alignment: .leading)
+                        .onTapGesture(count: 2) { onDoubleClickSpeaker(label) }
+                        .help("Double-click to rename")
+                }
             }
 
             // Timestamp — click to jump to segment

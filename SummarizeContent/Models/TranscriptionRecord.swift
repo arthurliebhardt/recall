@@ -13,6 +13,8 @@ final class TranscriptionRecord {
     var chatMessages: [ChatMessage]
     /// Path to the audio copy stored inside the app's sandbox container
     var localAudioPath: String?
+    /// Custom speaker name overrides: maps original label (e.g. "Speaker 1") to user-chosen name
+    var speakerNames: [String: String]
 
     init(
         fileName: String,
@@ -31,6 +33,7 @@ final class TranscriptionRecord {
         self.fullText = fullText
         self.chatMessages = []
         self.localAudioPath = localAudioPath
+        self.speakerNames = [:]
     }
 
     /// URL to the local audio copy inside the sandbox
@@ -45,6 +48,21 @@ final class TranscriptionRecord {
             return String(name[name.startIndex..<dotIndex])
         }
         return name
+    }
+
+    /// Returns the display name for a speaker, using custom name if set
+    func displayNameForSpeaker(_ originalLabel: String) -> String {
+        speakerNames[originalLabel] ?? originalLabel
+    }
+
+    /// Rename a speaker across all segments and words
+    func renameSpeaker(from originalLabel: String, to newName: String) {
+        let trimmed = newName.trimmingCharacters(in: .whitespaces)
+        if trimmed.isEmpty {
+            speakerNames.removeValue(forKey: originalLabel)
+        } else {
+            speakerNames[originalLabel] = trimmed
+        }
     }
 
     /// Directory where audio copies are stored
