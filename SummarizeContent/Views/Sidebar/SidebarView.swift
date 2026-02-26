@@ -121,8 +121,7 @@ private struct YouTubeImportPopover: View {
     @Binding var isPresented: Bool
 
     private var isValidURL: Bool {
-        guard let url = URL(string: urlText) else { return false }
-        return YouTubeService.isYouTubeURL(url)
+        YouTubeService.normalizedYouTubeURL(urlText) != nil
     }
 
     var body: some View {
@@ -152,7 +151,7 @@ private struct YouTubeImportPopover: View {
     }
 
     private func importIfValid() {
-        guard let url = URL(string: urlText), isValidURL else { return }
+        guard let url = YouTubeService.normalizedYouTubeURL(urlText) else { return }
         isPresented = false
         transcriptionVM.importYouTubeURL(url, modelContext: modelContext)
         urlText = ""

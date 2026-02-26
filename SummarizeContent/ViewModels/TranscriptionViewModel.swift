@@ -131,6 +131,7 @@ final class TranscriptionViewModel {
 
     /// Import audio from a YouTube URL: download + fetch captions in parallel → use captions or fall back to Whisper → diarize → save
     func importYouTubeURL(_ url: URL, modelContext: ModelContext) {
+        let normalizedURL = YouTubeService.normalizedYouTubeURL(url.absoluteString) ?? url
         let jobID = UUID()
         let job = ImportJob(id: jobID, title: "YouTube video", state: .downloadingYouTube(0))
         importJobs.append(job)
@@ -150,14 +151,13 @@ final class TranscriptionViewModel {
                         }
                     }
                 }
+                defer { progressTask.cancel() }
 
-                let captionService = self.captionService
-                async let captionResult = captionService.fetchCaptions(from: url)
-                async let audioResult = self.youTubeService.downloadAudio(from: url)
+                async let captionResult = self.fetchCaptionsWithTimeout(from: normalizedURL)
+                async let audioResult = self.youTubeService.downloadAudio(from: normalizedURL)
 
-                let captions = await captionResult
                 let (rawAudioURL, title) = try await audioResult
-                progressTask.cancel()
+                let captions = await captionResult
 
                 // Update the job title now that we know it
                 if let idx = self.importJobs.firstIndex(where: { $0.id == jobID }) {
@@ -211,7 +211,7 @@ final class TranscriptionViewModel {
                 // Step 7: Save to SwiftData
                 let record = TranscriptionRecord(
                     fileName: title,
-                    fileURL: url,
+                    fileURL: normalizedURL,
                     duration: duration,
                     segments: segments,
                     fullText: fullText,
@@ -228,6 +228,7 @@ final class TranscriptionViewModel {
                 // Clean up temp file
                 try? FileManager.default.removeItem(at: audioURL)
             } catch {
+                if Task.isCancelled { return }
                 self.removeJob(jobID)
                 self.latestError = error.localizedDescription
             }
@@ -267,6 +268,23 @@ final class TranscriptionViewModel {
         importJobs.removeAll { $0.id == id }
     }
 
+    /// Don't let caption fetches block YouTube import if YouTube's caption endpoint stalls.
+    private func fetchCaptionsWithTimeout(from url: URL, timeout: Duration = .seconds(6)) async -> YouTubeCaptionResult? {
+        await withTaskGroup(of: YouTubeCaptionResult?.self) { group in
+            group.addTask { [captionService] in
+                await captionService.fetchCaptions(from: url)
+            }
+            group.addTask {
+                try? await Task.sleep(for: timeout)
+                return nil
+            }
+
+            let first = await group.next() ?? nil
+            group.cancelAll()
+            return first
+        }
+    }
+
     // MARK: - Speaker Label Merge
 
     /// Assign speaker labels to segments and words by finding the diarization speaker
@@ -275,32 +293,45 @@ final class TranscriptionViewModel {
         segments: [TranscriptionSegment],
         speakerSegments: [SpeakerSegment]
     ) -> [TranscriptionSegment] {
+        let diarizationSegments = speakerSegments
+            .filter { $0.end > $0.start }
+            .sorted { $0.start < $1.start }
+        guard !diarizationSegments.isEmpty else { return segments }
+
         // Build a friendly label map: "speaker_0" → "Speaker 1"
         var labelMap: [String: String] = [:]
         var nextIndex = 1
-        for seg in speakerSegments {
+        for seg in diarizationSegments {
             if labelMap[seg.speakerId] == nil {
                 labelMap[seg.speakerId] = "Speaker \(nextIndex)"
                 nextIndex += 1
             }
         }
 
+        var previousSegmentLabel: String?
         return segments.map { segment in
             var updated = segment
             updated.speakerLabel = bestSpeaker(
                 start: segment.startTime,
                 end: segment.endTime,
-                speakerSegments: speakerSegments,
-                labelMap: labelMap
+                speakerSegments: diarizationSegments,
+                labelMap: labelMap,
+                fallbackLabel: previousSegmentLabel
             )
+            previousSegmentLabel = updated.speakerLabel ?? previousSegmentLabel
+
+            var previousWordLabel = updated.speakerLabel
             updated.words = segment.words.map { word in
                 var w = word
+                let wordEnd = word.endTime > word.startTime ? word.endTime : word.startTime + 0.12
                 w.speakerLabel = bestSpeaker(
                     start: word.startTime,
-                    end: word.endTime,
-                    speakerSegments: speakerSegments,
-                    labelMap: labelMap
+                    end: wordEnd,
+                    speakerSegments: diarizationSegments,
+                    labelMap: labelMap,
+                    fallbackLabel: previousWordLabel
                 )
+                previousWordLabel = w.speakerLabel ?? previousWordLabel
                 return w
             }
             return updated
@@ -313,13 +344,17 @@ final class TranscriptionViewModel {
         start: TimeInterval,
         end: TimeInterval,
         speakerSegments: [SpeakerSegment],
-        labelMap: [String: String]
+        labelMap: [String: String],
+        fallbackLabel: String?
     ) -> String? {
+        let overlapTolerance: TimeInterval = 0.12
+        let adjustedEnd = max(end, start + 0.01)
+
         // First try: find speaker with the most overlap
         var overlapBySpeaker: [String: TimeInterval] = [:]
         for seg in speakerSegments {
-            let overlapStart = max(start, seg.start)
-            let overlapEnd = min(end, seg.end)
+            let overlapStart = max(start - overlapTolerance, seg.start)
+            let overlapEnd = min(adjustedEnd + overlapTolerance, seg.end)
             let overlap = overlapEnd - overlapStart
             if overlap > 0 {
                 overlapBySpeaker[seg.speakerId, default: 0] += overlap
@@ -330,14 +365,24 @@ final class TranscriptionViewModel {
         }
 
         // Fallback: find the nearest diarization segment by time distance
-        let midpoint = (start + end) / 2
+        let midpoint = (start + adjustedEnd) / 2
         let nearest = speakerSegments.min { a, b in
-            let distA = min(abs(a.start - midpoint), abs(a.end - midpoint))
-            let distB = min(abs(b.start - midpoint), abs(b.end - midpoint))
+            let distA = distance(from: midpoint, to: a)
+            let distB = distance(from: midpoint, to: b)
             return distA < distB
         }
-        guard let nearest else { return nil }
-        return labelMap[nearest.speakerId]
+        guard let nearest else { return fallbackLabel }
+        return labelMap[nearest.speakerId] ?? fallbackLabel
+    }
+
+    private static func distance(from point: TimeInterval, to segment: SpeakerSegment) -> TimeInterval {
+        if point < segment.start {
+            return segment.start - point
+        }
+        if point > segment.end {
+            return point - segment.end
+        }
+        return 0
     }
 
     /// Copy the imported file into the app's sandbox container

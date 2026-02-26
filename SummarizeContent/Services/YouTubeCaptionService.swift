@@ -19,23 +19,30 @@ struct YouTubeCaptionService {
     // MARK: - Video ID Extraction
 
     static func extractVideoID(from url: URL) -> String? {
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let host = components.host?.lowercased() else {
+            return nil
+        }
+
         // youtu.be/VIDEO_ID
-        if let host = url.host()?.lowercased(), host.contains("youtu.be") {
-            let path = url.path().trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        if host.contains("youtu.be") {
+            let path = components.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
             return path.isEmpty ? nil : path
         }
 
-        // youtube.com/shorts/VIDEO_ID
-        if url.absoluteString.contains("/shorts/") {
-            let parts = url.pathComponents
-            if let idx = parts.firstIndex(of: "shorts"), idx + 1 < parts.count {
-                return parts[idx + 1]
+        // youtube.com/shorts/VIDEO_ID, /live/VIDEO_ID, /embed/VIDEO_ID
+        for segment in ["shorts", "live", "embed"] {
+            let parts = components.path.split(separator: "/").map(String.init)
+            if let idx = parts.firstIndex(of: segment), idx + 1 < parts.count {
+                let id = parts[idx + 1]
+                if !id.isEmpty {
+                    return id
+                }
             }
         }
 
         // youtube.com/watch?v=VIDEO_ID
-        if let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
-           let vParam = components.queryItems?.first(where: { $0.name == "v" })?.value,
+        if let vParam = components.queryItems?.first(where: { $0.name == "v" })?.value,
            !vParam.isEmpty {
             return vParam
         }
