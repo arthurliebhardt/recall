@@ -30,13 +30,15 @@ final class TranscriptionViewModel {
     private let diarizationService: DiarizationService
     private let youTubeService: YouTubeService
     private let captionService: YouTubeCaptionService
+    private let sapVideoService: SAPVideoService
 
-    init(transcriptionService: TranscriptionService, audioExtractionService: AudioExtractionService, diarizationService: DiarizationService, youTubeService: YouTubeService, captionService: YouTubeCaptionService = YouTubeCaptionService()) {
+    init(transcriptionService: TranscriptionService, audioExtractionService: AudioExtractionService, diarizationService: DiarizationService, youTubeService: YouTubeService, captionService: YouTubeCaptionService = YouTubeCaptionService(), sapVideoService: SAPVideoService) {
         self.transcriptionService = transcriptionService
         self.audioExtractionService = audioExtractionService
         self.diarizationService = diarizationService
         self.youTubeService = youTubeService
         self.captionService = captionService
+        self.sapVideoService = sapVideoService
     }
 
     var isImporting: Bool {
@@ -191,6 +193,107 @@ final class TranscriptionViewModel {
                     segments = result.segments
                     fullText = result.fullText
                 }
+
+                // Step 5: Speaker diarization
+                if self.diarizationService.modelState.isReady {
+                    self.updateJob(jobID, state: .diarizing)
+                    let speakerSegments = try await self.diarizationService.diarize(audioPath: audioURL.path)
+                    if !speakerSegments.isEmpty {
+                        segments = Self.assignSpeakerLabels(
+                            segments: segments,
+                            speakerSegments: speakerSegments
+                        )
+                    }
+                }
+
+                // Step 6: Copy audio into sandbox for playback
+                self.updateJob(jobID, state: .saving)
+                let localAudioPath = try self.copyFileToSandbox(audioURL)
+
+                // Step 7: Save to SwiftData
+                let record = TranscriptionRecord(
+                    fileName: title,
+                    fileURL: normalizedURL,
+                    duration: duration,
+                    segments: segments,
+                    fullText: fullText,
+                    localAudioPath: localAudioPath
+                )
+                modelContext.insert(record)
+                try modelContext.save()
+
+                self.removeJob(jobID)
+                if self.selectedRecord == nil {
+                    self.selectedRecord = record
+                }
+
+                // Clean up temp file
+                try? FileManager.default.removeItem(at: audioURL)
+            } catch {
+                if Task.isCancelled { return }
+                self.removeJob(jobID)
+                self.latestError = error.localizedDescription
+            }
+        }
+
+        if let index = importJobs.firstIndex(where: { $0.id == jobID }) {
+            importJobs[index].task = task
+        }
+    }
+
+    /// Import audio from an SAP Video URL: download via yt-dlp with Chrome cookies → normalize → Whisper transcribe → diarize → save
+    func importSAPVideoURL(_ url: URL, modelContext: ModelContext) {
+        guard let normalizedURL = SAPVideoService.normalizedSAPVideoURL(url.absoluteString) else {
+            latestError = SAPVideoService.SAPVideoError.invalidURL.localizedDescription
+            return
+        }
+
+        guard transcriptionService.modelState.isReady else {
+            latestError = "Whisper model is not loaded. SAP videos have no captions, so a Whisper model is required. Please load a model in Settings first."
+            return
+        }
+
+        let jobID = UUID()
+        let job = ImportJob(id: jobID, title: "SAP Video", state: .downloadingYouTube(0))
+        importJobs.append(job)
+
+        let task = Task { [weak self] in
+            guard let self else { return }
+
+            do {
+                // Step 1: Download audio via yt-dlp
+                let progressTask = Task {
+                    while !Task.isCancelled {
+                        try await Task.sleep(for: .milliseconds(100))
+                        let progress = await self.sapVideoService.downloadProgress
+                        if let idx = self.importJobs.firstIndex(where: { $0.id == jobID }),
+                           case .downloadingYouTube = self.importJobs[idx].state {
+                            self.importJobs[idx].state = .downloadingYouTube(progress)
+                        }
+                    }
+                }
+                defer { progressTask.cancel() }
+
+                let (rawAudioURL, title) = try await self.sapVideoService.downloadAudio(from: normalizedURL)
+
+                // Update the job title now that we know it
+                if let idx = self.importJobs.firstIndex(where: { $0.id == jobID }) {
+                    self.importJobs[idx].title = title
+                }
+
+                // Step 2: Re-export through AVFoundation to normalize the audio format
+                self.updateJob(jobID, state: .extractingAudio)
+                let audioURL = try await self.audioExtractionService.reExportAudio(from: rawAudioURL)
+                try? FileManager.default.removeItem(at: rawAudioURL)
+
+                // Step 3: Get duration
+                let duration = try await self.audioExtractionService.getDuration(of: audioURL)
+
+                // Step 4: Transcribe with Whisper (SAP videos have no captions)
+                self.updateJob(jobID, state: .transcribing(0))
+                let result = try await self.transcriptionService.transcribe(audioPath: audioURL.path)
+                var segments = result.segments
+                let fullText = result.fullText
 
                 // Step 5: Speaker diarization
                 if self.diarizationService.modelState.isReady {

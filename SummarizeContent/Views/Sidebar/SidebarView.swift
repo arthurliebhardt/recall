@@ -10,6 +10,8 @@ struct SidebarView: View {
     @Binding var showFileImporter: Bool
     @State private var showYouTubePopover = false
     @State private var youTubeURLText = ""
+    @State private var showSAPVideoPopover = false
+    @State private var sapVideoURLText = ""
     @State private var renamingRecord: TranscriptionRecord?
     @State private var renameText = ""
 
@@ -69,6 +71,12 @@ struct SidebarView: View {
                         Label("YouTube Link", systemImage: "play.rectangle")
                     }
                     .keyboardShortcut("i", modifiers: [.command, .shift])
+
+                    Button {
+                        showSAPVideoPopover = true
+                    } label: {
+                        Label("SAP Video Link", systemImage: "video")
+                    }
                 } label: {
                     Label("Import", systemImage: "plus")
                 }
@@ -76,6 +84,12 @@ struct SidebarView: View {
                     YouTubeImportPopover(
                         urlText: $youTubeURLText,
                         isPresented: $showYouTubePopover
+                    )
+                }
+                .popover(isPresented: $showSAPVideoPopover) {
+                    SAPVideoImportPopover(
+                        urlText: $sapVideoURLText,
+                        isPresented: $showSAPVideoPopover
                     )
                 }
             }
@@ -154,6 +168,50 @@ private struct YouTubeImportPopover: View {
         guard let url = YouTubeService.normalizedYouTubeURL(urlText) else { return }
         isPresented = false
         transcriptionVM.importYouTubeURL(url, modelContext: modelContext)
+        urlText = ""
+    }
+}
+
+private struct SAPVideoImportPopover: View {
+    @Environment(TranscriptionViewModel.self) private var transcriptionVM
+    @Environment(\.modelContext) private var modelContext
+    @Binding var urlText: String
+    @Binding var isPresented: Bool
+
+    private var isValidURL: Bool {
+        SAPVideoService.normalizedSAPVideoURL(urlText) != nil
+    }
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Text("Import from SAP Video")
+                .font(.headline)
+
+            TextField("Paste SAP Video URL...", text: $urlText)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 320)
+                .onSubmit { importIfValid() }
+
+            HStack {
+                Button("Cancel") {
+                    isPresented = false
+                }
+                .keyboardShortcut(.cancelAction)
+
+                Button("Import") {
+                    importIfValid()
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(!isValidURL)
+            }
+        }
+        .padding()
+    }
+
+    private func importIfValid() {
+        guard let url = SAPVideoService.normalizedSAPVideoURL(urlText) else { return }
+        isPresented = false
+        transcriptionVM.importSAPVideoURL(url, modelContext: modelContext)
         urlText = ""
     }
 }

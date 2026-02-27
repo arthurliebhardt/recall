@@ -217,6 +217,12 @@ final class YouTubeService {
     }
 
     private static func findYtDlp() -> String? {
+        // Check bundled binary first
+        if let bundledPath = Bundle.main.executableURL?.deletingLastPathComponent().appendingPathComponent("yt-dlp").path,
+           FileManager.default.isExecutableFile(atPath: bundledPath) {
+            return bundledPath
+        }
+
         var paths = [
             "/opt/homebrew/bin/yt-dlp",
             "/usr/local/bin/yt-dlp",

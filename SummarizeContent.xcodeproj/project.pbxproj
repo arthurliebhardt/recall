@@ -34,7 +34,9 @@
 		EB9240B1C978D9011B96CE4F /* MLXLLM in Frameworks */ = {isa = PBXBuildFile; productRef = 0BAC5C4C4F5048E03B6203F0 /* MLXLLM */; };
 		EDCD1FA8C8504307469199D7 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D7753964E474BC4FE1D25C7 /* SettingsView.swift */; };
 		F606BB4E058AF2E4F6D96B2B /* DiarizationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7C0EEA98636685C828658E5 /* DiarizationService.swift */; };
+		B1C2D3E4F5A6B7C8D9E0F1A2 /* SAPVideoService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1C2D3E4F5A6B7C8D9E0F1A3 /* SAPVideoService.swift */; };
 		FA6436AC85E01950C8CADB34 /* YouTubeKit in Frameworks */ = {isa = PBXBuildFile; productRef = 8B96791E2E94C9D678A328F7 /* YouTubeKit */; };
+		C1D2E3F4A5B6C7D8E9F0A1B2 /* yt-dlp in CopyFiles */ = {isa = PBXBuildFile; fileRef = C1D2E3F4A5B6C7D8E9F0A1B3 /* yt-dlp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -59,12 +61,27 @@
 		D4C616898C25B49473567D34 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		E7AAA636C707B41852ED1DE3 /* ChatBubbleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatBubbleView.swift; sourceTree = "<group>"; };
 		E7C0EEA98636685C828658E5 /* DiarizationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiarizationService.swift; sourceTree = "<group>"; };
+		B1C2D3E4F5A6B7C8D9E0F1A3 /* SAPVideoService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SAPVideoService.swift; sourceTree = "<group>"; };
 		EDC3D6FDED787F69F4727707 /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
 		EF3C81ECAFCCC615F6B5F962 /* ChatInputView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatInputView.swift; sourceTree = "<group>"; };
 		F311966E66774BAD583C86BF /* AudioPlayerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPlayerService.swift; sourceTree = "<group>"; };
 		F3D511C6666F352008F16CDE /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		AABB0011CCDD2233EEFF4456 /* AppIcon.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = AppIcon.icns; sourceTree = "<group>"; };
+		C1D2E3F4A5B6C7D8E9F0A1B3 /* yt-dlp */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.executable"; path = "yt-dlp"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		C1D2E3F4A5B6C7D8E9F0A1B5 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 6;
+			files = (
+				C1D2E3F4A5B6C7D8E9F0A1B2 /* yt-dlp in CopyFiles */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		851E74FBA379E3DC2AB6723D /* Frameworks */ = {
@@ -130,6 +147,14 @@
 			path = Models;
 			sourceTree = "<group>";
 		};
+		C1D2E3F4A5B6C7D8E9F0A1B4 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				C1D2E3F4A5B6C7D8E9F0A1B3 /* yt-dlp */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
 		8C450DEFF83195AA7ABD97FE /* SummarizeContent */ = {
 			isa = PBXGroup;
 			children = (
@@ -140,6 +165,7 @@
 				138E359207E4E93A26642EBA /* SummarizeContent.entitlements */,
 				3AF853B613C85626B9710540 /* SummarizeContentApp.swift */,
 				73E790CCBF038818416A8554 /* Models */,
+				C1D2E3F4A5B6C7D8E9F0A1B4 /* Resources */,
 				9B7F6C355C3D323790100A96 /* Services */,
 				AD7C51A39064E17F95E36FED /* ViewModels */,
 				2E2E65EF8591AB8A8E7C87F4 /* Views */,
@@ -162,6 +188,7 @@
 				F311966E66774BAD583C86BF /* AudioPlayerService.swift */,
 				E7C0EEA98636685C828658E5 /* DiarizationService.swift */,
 				83B88EEB17568271EC883FCC /* LLMService.swift */,
+				B1C2D3E4F5A6B7C8D9E0F1A3 /* SAPVideoService.swift */,
 				D2A3B37F05B2374E5BD631DC /* TranscriptionService.swift */,
 				A1B2C3D4E5F60718293041AB /* YouTubeCaptionService.swift */,
 				0E5E49B6B994EE18E6D163F2 /* YouTubeService.swift */,
@@ -204,6 +231,7 @@
 				D6F8126FDF54B28A311B6557 /* Sources */,
 				461769FB463266F08733F95D /* Resources */,
 				851E74FBA379E3DC2AB6723D /* Frameworks */,
+				C1D2E3F4A5B6C7D8E9F0A1B5 /* CopyFiles */,
 			);
 			buildRules = (
 			);
@@ -283,6 +311,7 @@
 				F606BB4E058AF2E4F6D96B2B /* DiarizationService.swift in Sources */,
 				3F3841867B6A834F4FF5576B /* LLMService.swift in Sources */,
 				165E7D81129E425B93A8501D /* ModelLoadingOverlay.swift in Sources */,
+				B1C2D3E4F5A6B7C8D9E0F1A2 /* SAPVideoService.swift in Sources */,
 				A2B3C4D5E6F7081930415263 /* OnboardingView.swift in Sources */,
 				EDCD1FA8C8504307469199D7 /* SettingsView.swift in Sources */,
 				4D7A2A08D6191410E1B415DF /* SidebarView.swift in Sources */,

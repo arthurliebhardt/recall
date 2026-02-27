@@ -9,6 +9,7 @@ struct SummarizeContentApp: App {
     @State private var llmService = LLMService()
     @State private var diarizationService = DiarizationService()
     @State private var youTubeService = YouTubeService()
+    @State private var sapVideoService = SAPVideoService()
     @State private var transcriptionViewModel: TranscriptionViewModel
     @State private var chatViewModel: ChatViewModel
 
@@ -20,16 +21,19 @@ struct SummarizeContentApp: App {
         let llm = LLMService()
         let ds = DiarizationService()
         let yt = YouTubeService()
+        let sap = SAPVideoService()
         _transcriptionService = State(initialValue: ts)
         _audioExtractionService = State(initialValue: aes)
         _llmService = State(initialValue: llm)
         _diarizationService = State(initialValue: ds)
         _youTubeService = State(initialValue: yt)
+        _sapVideoService = State(initialValue: sap)
         _transcriptionViewModel = State(initialValue: TranscriptionViewModel(
             transcriptionService: ts,
             audioExtractionService: aes,
             diarizationService: ds,
-            youTubeService: yt
+            youTubeService: yt,
+            sapVideoService: sap
         ))
         _chatViewModel = State(initialValue: ChatViewModel(llmService: llm))
 
