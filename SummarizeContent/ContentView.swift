@@ -14,6 +14,7 @@ struct ContentView: View {
     @AppStorage("llmModel") private var savedLLMModel = LLMService.defaultModelId
 
     @State private var showFileImporter = false
+    @State private var isDropTargeted = false
 
     var body: some View {
         @Bindable var transcriptionVM = transcriptionVM
@@ -66,9 +67,27 @@ struct ContentView: View {
                 print("File import error: \(error.localizedDescription)")
             }
         }
-        .onDrop(of: [.fileURL], isTargeted: nil) { providers in
+        .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
             handleDrop(providers)
             return true
+        }
+        .overlay {
+            if isDropTargeted {
+                RoundedRectangle(cornerRadius: 12)
+                    .strokeBorder(Color.accentColor, style: StrokeStyle(lineWidth: 3, dash: [8]))
+                    .background(Color.accentColor.opacity(0.08))
+                    .overlay {
+                        VStack(spacing: 8) {
+                            Image(systemName: "arrow.down.doc")
+                                .font(.system(size: 40))
+                            Text("Drop to import")
+                                .font(.title3.weight(.medium))
+                        }
+                        .foregroundStyle(.secondary)
+                    }
+                    .padding(6)
+                    .allowsHitTesting(false)
+            }
         }
         .alert(
             "Import Error",
