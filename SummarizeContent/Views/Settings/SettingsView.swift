@@ -11,6 +11,8 @@ struct SettingsView: View {
     @AppStorage("whisperModel") private var savedWhisperModel = TranscriptionService.defaultModel
     @AppStorage("llmModel") private var savedLLMModel = LLMService.defaultModelId
 
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+
     var body: some View {
         TabView {
             whisperSettings
@@ -21,6 +23,11 @@ struct SettingsView: View {
             llmSettings
                 .tabItem {
                     Label("LLM", systemImage: "brain")
+                }
+
+            generalSettings
+                .tabItem {
+                    Label("General", systemImage: "gear")
                 }
         }
         .frame(width: 500, height: 350)
@@ -105,9 +112,9 @@ struct SettingsView: View {
 
             Section("Suggested Models") {
                 VStack(alignment: .leading, spacing: 4) {
-                    modelSuggestion("mlx-community/Qwen3-4B-4bit", size: "~2.5 GB")
-                    modelSuggestion("mlx-community/Llama-3.2-3B-Instruct-4bit", size: "~1.8 GB")
-                    modelSuggestion("mlx-community/gemma-3-4b-it-qat-4bit", size: "~2.5 GB")
+                    modelSuggestion("mlx-community/Qwen3-8B-4bit", size: "~4.9 GB — Recommended")
+                    modelSuggestion("mlx-community/Llama-3.2-3B-Instruct-4bit", size: "~1.8 GB — Light")
+                    modelSuggestion("mlx-community/Qwen3-14B-4bit", size: "~8.5 GB — 48GB+ RAM")
                 }
             }
 
@@ -115,6 +122,29 @@ struct SettingsView: View {
                 Text("Models run locally using Apple MLX. First load will download the model from HuggingFace.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
+        .padding()
+    }
+
+    // MARK: - General Settings
+
+    private var generalSettings: some View {
+        Form {
+            Section("Onboarding") {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Restart Onboarding")
+                        Text("Re-run the initial setup wizard to change models.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button("Restart") {
+                        hasCompletedOnboarding = false
+                    }
+                }
             }
         }
         .formStyle(.grouped)

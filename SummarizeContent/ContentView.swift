@@ -9,6 +9,10 @@ struct ContentView: View {
     @Environment(DiarizationService.self) private var diarizationService
     @Environment(\.modelContext) private var modelContext
 
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    @AppStorage("whisperModel") private var savedWhisperModel = TranscriptionService.defaultModel
+    @AppStorage("llmModel") private var savedLLMModel = LLMService.defaultModelId
+
     @State private var showFileImporter = false
 
     var body: some View {
@@ -16,7 +20,7 @@ struct ContentView: View {
 
         NavigationSplitView {
             SidebarView(showFileImporter: $showFileImporter)
-                .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 280)
+                .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 300)
         } detail: {
             HSplitView {
                 // Transcription panel
@@ -80,7 +84,14 @@ struct ContentView: View {
             }
         }
         .overlay {
-            if !transcriptionService.modelState.isReady || !llmService.modelState.isReady || !diarizationService.modelState.isReady {
+            if !hasCompletedOnboarding {
+                OnboardingView {
+                    withAnimation {
+                        hasCompletedOnboarding = true
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if !transcriptionService.modelState.isReady || !llmService.modelState.isReady || !diarizationService.modelState.isReady {
                 ModelLoadingOverlay(
                     whisperState: transcriptionService.modelState,
                     llmState: llmService.modelState,
@@ -88,15 +99,16 @@ struct ContentView: View {
                 )
             }
         }
-        .task {
+        .task(id: hasCompletedOnboarding) {
+            guard hasCompletedOnboarding else { return }
             async let whisper: Void = {
                 if !transcriptionService.modelState.isReady {
-                    await transcriptionService.loadModel()
+                    await transcriptionService.loadModel(savedWhisperModel)
                 }
             }()
             async let llm: Void = {
                 if !llmService.modelState.isReady {
-                    await llmService.loadModel()
+                    await llmService.loadModel(savedLLMModel)
                 }
             }()
             async let diarization: Void = {

@@ -62,6 +62,7 @@ struct SummarizeContentApp: App {
                 .environment(transcriptionViewModel)
                 .environment(chatViewModel)
         }
+        .defaultSize(width: 1100, height: 650)
         .modelContainer(modelContainer)
 
         Settings {
