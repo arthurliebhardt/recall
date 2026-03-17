@@ -112,9 +112,9 @@ struct SettingsView: View {
 
             Section("Suggested Models") {
                 VStack(alignment: .leading, spacing: 4) {
-                    modelSuggestion("mlx-community/Qwen3-8B-4bit", size: "~4.9 GB — Recommended")
-                    modelSuggestion("mlx-community/Llama-3.2-3B-Instruct-4bit", size: "~1.8 GB — Light")
-                    modelSuggestion("mlx-community/Qwen3-14B-4bit", size: "~8.5 GB — 48GB+ RAM")
+                    modelSuggestion(LLMService.defaultModelId, size: "Default")
+                    modelSuggestion("mlx-community/Llama-3.2-3B-Instruct-4bit", size: "Smaller alternative")
+                    modelSuggestion("mlx-community/Qwen3-14B-4bit", size: "Larger alternative")
                 }
             }
 

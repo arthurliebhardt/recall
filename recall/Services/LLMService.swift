@@ -38,7 +38,7 @@ final class LLMService {
         }
     }
 
-    static let defaultModelId = "mlx-community/Qwen3-8B-4bit"
+    nonisolated static let defaultModelId = "mlx-community/Qwen3.5-9B-OptiQ-4bit"
 
     private(set) var modelState: ModelState = .notLoaded
     private(set) var isGenerating = false

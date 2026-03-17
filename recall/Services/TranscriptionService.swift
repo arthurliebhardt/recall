@@ -43,6 +43,12 @@ final class TranscriptionService {
     /// Default model: OpenAI's turbo variant (4 decoder layers instead of 32 = ~4-8x faster)
     /// with WhisperKit's Neural Engine optimized build
     static let defaultModel = "openai_whisper-large-v3-v20240930_turbo"
+    private static var huggingFaceCacheDirectory: URL {
+        let cachesDirectory = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
+        let directory = cachesDirectory.appendingPathComponent("huggingface", isDirectory: true)
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory
+    }
 
     private(set) var modelState: ModelState = .notLoaded
     private(set) var transcriptionProgress: Double = 0
@@ -61,6 +67,7 @@ final class TranscriptionService {
             logger.notice("[WhisperKit] Downloading model files...")
             let modelFolder = try await WhisperKit.download(
                 variant: variant,
+                downloadBase: Self.huggingFaceCacheDirectory,
                 progressCallback: { [weak self] progress in
                     Task { @MainActor [weak self] in
                         self?.modelState = .downloading(progress.fractionCompleted)
@@ -101,7 +108,9 @@ final class TranscriptionService {
     /// Fetch available model variants from the HuggingFace repo.
     func fetchAvailableModels() async -> [String] {
         do {
-            return try await WhisperKit.fetchAvailableModels()
+            return try await WhisperKit.fetchAvailableModels(
+                downloadBase: Self.huggingFaceCacheDirectory
+            )
         } catch {
             return []
         }

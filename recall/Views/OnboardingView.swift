@@ -8,15 +8,17 @@ struct OnboardingView: View {
 
     @State private var step = 0
     @State private var selectedWhisperModel = TranscriptionService.defaultModel
-    @State private var llmSelection: LLMSelection = .ram8gb
+    @State private var llmSelection: LLMSelection = .defaultModel
     @State private var customPickerSelection = ""
     @State private var manualModelText = ""
     @State private var customIsManual = false
     @State private var availableWhisperModels: [String] = []
     @State private var cachedModels: [(id: String, size: String)] = []
     @State private var selectedCachedModel: String = ""
+    private let manualEntryTag = "_manual_"
 
     private static let otherLLMs: [(id: String, size: String)] = [
+        ("mlx-community/Qwen3-8B-4bit", "~4.9 GB"),
         ("mlx-community/Phi-4-mini-instruct-4bit", "~2.4 GB"),
         ("mlx-community/gemma-3-4b-it-qat-4bit", "~2.5 GB"),
         ("mlx-community/Mistral-7B-Instruct-v0.3-4bit", "~3.8 GB"),
@@ -30,80 +32,16 @@ struct OnboardingView: View {
 
     var onComplete: () -> Void
 
-    // MARK: - RAM Detection
+    // MARK: - LLM Selection
 
-    private static var systemRAMGB: Int {
-        Int(ProcessInfo.processInfo.physicalMemory / (1024 * 1024 * 1024))
-    }
+    private enum LLMSelection {
+        case defaultModel
+        case custom
 
-    private static var recommendedTier: LLMSelection {
-        let ram = systemRAMGB
-        if ram >= 48 { return .ram48gb }
-        if ram >= 16 { return .ram16gb }
-        if ram >= 8 { return .ram8gb }
-        return .ramLow
-    }
-
-    // MARK: - LLM Tiers
-
-    private enum LLMSelection: String, CaseIterable {
-        case ramLow = "mlx-community/gemma-3-1b-it-qat-4bit"
-        case ram8gb = "mlx-community/Qwen3-4B-4bit"
-        case ram16gb = "mlx-community/Qwen3-8B-4bit"
-        case ram48gb = "mlx-community/Qwen3-14B-4bit"
-        case custom = "_custom_"
-
-        var displayName: String {
+        var modelId: String? {
             switch self {
-            case .ramLow: "Gemma 3 1B"
-            case .ram8gb: "Qwen 3 4B"
-            case .ram16gb: "Qwen 3 8B"
-            case .ram48gb: "Qwen 3 14B"
-            case .custom: "Custom HuggingFace Model"
-            }
-        }
-
-        var ramLabel: String {
-            switch self {
-            case .ramLow: "Under 8 GB RAM"
-            case .ram8gb: "8 GB RAM"
-            case .ram16gb: "16 GB RAM"
-            case .ram48gb: "48 GB+ RAM"
-            case .custom: ""
-            }
-        }
-
-        var modelSize: String {
-            switch self {
-            case .ramLow: "~1.6 GB in memory"
-            case .ram8gb: "~2.75 GB in memory"
-            case .ram16gb: "~5 GB in memory"
-            case .ram48gb: "~8.5 GB in memory"
-            case .custom: ""
-            }
-        }
-
-        var note: String {
-            switch self {
-            case .ramLow:
-                "Extremely fast. Genuinely useful for quick Q&A, summarization, and simple tasks."
-            case .ram8gb:
-                "Matches older 7B models despite being half the size. The /think toggle lets you switch between fast responses and deeper chain-of-thought reasoning."
-            case .ram16gb:
-                "Major step up in quality — handles complex coding, nuanced writing, and multi-step reasoning well. Leaves generous room for long context."
-            case .ram48gb:
-                "Where local AI starts rivaling cloud APIs. Expert-level reasoning, serious code generation, nuanced creative writing."
-            case .custom: ""
-            }
-        }
-
-        var badgeColor: Color {
-            switch self {
-            case .ramLow: Color.mint.opacity(0.15)
-            case .ram8gb: Color.green.opacity(0.15)
-            case .ram16gb: Color.accentColor.opacity(0.15)
-            case .ram48gb: Color.orange.opacity(0.15)
-            case .custom: .clear
+            case .defaultModel: LLMService.defaultModelId
+            case .custom: nil
             }
         }
     }
@@ -133,9 +71,7 @@ struct OnboardingView: View {
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
             .shadow(radius: 20, y: 10)
         }
-        .onAppear {
-            llmSelection = Self.recommendedTier
-        }
+        .onAppear(perform: configureInitialLLMSelection)
         .task {
             let models = await transcriptionService.fetchAvailableModels()
             if !models.isEmpty {
@@ -284,49 +220,24 @@ struct OnboardingView: View {
 
     private var llmStep: some View {
         VStack(spacing: 20) {
-            Image(systemName: "brain")
-                .font(.system(size: 36))
-                .foregroundStyle(Color.accentColor)
+            VStack(spacing: 8) {
+                Text("Select Model")
+                    .font(.title3.weight(.semibold))
 
-            Text("Chat Model")
-                .font(.title2.weight(.semibold))
-
-            VStack(spacing: 2) {
-                Text("Pick a model that fits your Mac.")
-                    .foregroundStyle(.secondary)
-                Text("Detected \(Self.systemRAMGB) GB RAM — recommended tier is pre-selected.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .multilineTextAlignment(.center)
-
-            VStack(spacing: 6) {
-                ForEach(LLMSelection.allCases, id: \.self) { option in
-                    llmOptionRow(option)
-                }
-
-                if llmSelection == .custom {
-                    VStack(spacing: 8) {
-                        Picker("Select a model", selection: $customPickerSelection) {
-                            Text("Choose a model…").tag("")
-                            ForEach(Self.otherLLMs, id: \.id) { model in
-                                Text("\(shortModelName(model.id))  (\(model.size))").tag(model.id)
-                            }
-                            Divider()
-                            Text("Enter manually…").tag("_manual_")
-                        }
-                        .labelsHidden()
-                        .onChange(of: customPickerSelection) {
-                            customIsManual = customPickerSelection == "_manual_"
-                        }
-
-                        if customIsManual {
-                            TextField("mlx-community/model-name", text: $manualModelText)
-                                .textFieldStyle(.roundedBorder)
-                                .font(.callout)
-                        }
+                Picker("Select a model", selection: llmPickerSelection) {
+                    Text("Qwen 3.5 9B (Default)").tag(LLMService.defaultModelId)
+                    ForEach(Self.otherLLMs, id: \.id) { model in
+                        Text("\(shortModelName(model.id))  (\(model.size))").tag(model.id)
                     }
-                    .padding(.leading, 28)
+                    Divider()
+                    Text("Enter manually…").tag(manualEntryTag)
+                }
+                .labelsHidden()
+
+                if customIsManual {
+                    TextField("mlx-community/model-name", text: $manualModelText)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.callout)
                 }
             }
 
@@ -344,61 +255,38 @@ struct OnboardingView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
-                .disabled(llmSelection == .custom && resolvedCustomModel.isEmpty)
+                .disabled(customIsManual && resolvedCustomModel.isEmpty)
             }
         }
     }
 
     // MARK: - Helpers
 
-    private func llmOptionRow(_ option: LLMSelection) -> some View {
-        let isRecommended = option == Self.recommendedTier
-
-        return HStack(spacing: 4) {
-            Button {
-                llmSelection = option
-            } label: {
-                HStack {
-                    Image(systemName: llmSelection == option ? "checkmark.circle.fill" : "circle")
-                        .foregroundStyle(llmSelection == option ? Color.accentColor : .secondary)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack(spacing: 6) {
-                            Text(option.displayName)
-                                .font(.callout.weight(.medium))
-                            if !option.ramLabel.isEmpty {
-                                Text(option.ramLabel)
-                                    .font(.caption2.weight(.semibold))
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(option.badgeColor, in: Capsule())
-                            }
-                            if isRecommended {
-                                Text("Recommended for you")
-                                    .font(.caption2.weight(.semibold))
-                                    .foregroundStyle(.white)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(Color.accentColor, in: Capsule())
-                            }
-                        }
-                        if !option.modelSize.isEmpty {
-                            Text("\(option.rawValue) — \(option.modelSize)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-
-                    Spacer()
+    private var llmPickerSelection: Binding<String> {
+        Binding(
+            get: {
+                if llmSelection == .defaultModel {
+                    return LLMService.defaultModelId
                 }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
+                return customIsManual ? manualEntryTag : customPickerSelection
+            },
+            set: { newValue in
+                if newValue == LLMService.defaultModelId {
+                    llmSelection = .defaultModel
+                    customPickerSelection = ""
+                    manualModelText = ""
+                    customIsManual = false
+                    return
+                }
 
-            if !option.note.isEmpty {
-                InfoButton(text: option.note)
+                llmSelection = .custom
+                customIsManual = newValue == manualEntryTag
+                customPickerSelection = customIsManual ? manualEntryTag : newValue
+                if !customIsManual {
+                    manualModelText = ""
+                }
             }
-        }
+        )
     }
 
     private var whisperModelOptions: [String] {
@@ -419,11 +307,32 @@ struct OnboardingView: View {
         return name
     }
 
+    private func configureInitialLLMSelection() {
+        if savedLLMModel == LLMService.defaultModelId {
+            llmSelection = .defaultModel
+            customPickerSelection = ""
+            manualModelText = ""
+            customIsManual = false
+            return
+        }
+
+        llmSelection = .custom
+        if Self.otherLLMs.contains(where: { $0.id == savedLLMModel }) {
+            customPickerSelection = savedLLMModel
+            manualModelText = ""
+            customIsManual = false
+        } else {
+            customPickerSelection = manualEntryTag
+            manualModelText = savedLLMModel
+            customIsManual = true
+        }
+    }
+
     private var resolvedCustomModel: String {
         if customIsManual {
             return manualModelText.trimmingCharacters(in: .whitespaces)
         }
-        return customPickerSelection.isEmpty || customPickerSelection == "_manual_" ? "" : customPickerSelection
+        return customPickerSelection.isEmpty || customPickerSelection == manualEntryTag ? "" : customPickerSelection
     }
 
     private func scanCachedModels() {
@@ -472,32 +381,7 @@ struct OnboardingView: View {
 
     private func finishOnboarding() {
         savedWhisperModel = selectedWhisperModel
-        savedLLMModel = llmSelection == .custom ? resolvedCustomModel : llmSelection.rawValue
+        savedLLMModel = llmSelection == .custom ? resolvedCustomModel : (llmSelection.modelId ?? LLMService.defaultModelId)
         onComplete()
-    }
-}
-
-// MARK: - Info Button with Popover
-
-private struct InfoButton: View {
-    let text: String
-    @State private var showPopover = false
-
-    var body: some View {
-        Button {
-            showPopover.toggle()
-        } label: {
-            Image(systemName: "info.circle")
-                .foregroundStyle(.secondary)
-                .font(.callout)
-        }
-        .buttonStyle(.plain)
-        .popover(isPresented: $showPopover, arrowEdge: .trailing) {
-            Text(text)
-                .font(.caption)
-                .padding(10)
-                .frame(width: 240)
-                .fixedSize(horizontal: false, vertical: true)
-        }
     }
 }
