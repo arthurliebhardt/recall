@@ -115,7 +115,7 @@ final class TranscriptionService {
 
     /// Strip Whisper special tokens like <|startoftranscript|>, <|en|>, <|0.00|>, etc.
     private static func cleanWhisperText(_ text: String) -> String {
-        text.replacing(/\<\|[^|]*\|\>/, with: "")
+        text.replacingOccurrences(of: #"<\|[^|]*\|>"#, with: "", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 

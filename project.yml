@@ -1,4 +1,4 @@
-name: SummarizeContent
+name: recall
 options:
   bundleIdPrefix: com.summarizecontent
   deploymentTarget:
@@ -21,21 +21,21 @@ packages:
     from: "0.4.3"
 
 targets:
-  SummarizeContent:
+  recall:
     type: application
     platform: macOS
     sources:
-      - SummarizeContent
+      - recall
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.summarizecontent.app
-        PRODUCT_NAME: SummarizeContent
+        PRODUCT_NAME: recall
         MARKETING_VERSION: "1.0.0"
         CURRENT_PROJECT_VERSION: "1"
         SWIFT_VERSION: "5.9"
         MACOSX_DEPLOYMENT_TARGET: "14.0"
-        INFOPLIST_FILE: SummarizeContent/Info.plist
-        CODE_SIGN_ENTITLEMENTS: SummarizeContent/SummarizeContent.entitlements
+        INFOPLIST_FILE: recall/Info.plist
+        CODE_SIGN_ENTITLEMENTS: recall/SummarizeContent.entitlements
         ENABLE_HARDENED_RUNTIME: true
     dependencies:
       - package: WhisperKit
@@ -46,7 +46,7 @@ targets:
       - package: FluidAudio
       - package: YouTubeKit
     entitlements:
-      path: SummarizeContent/SummarizeContent.entitlements
+      path: recall/SummarizeContent.entitlements
       properties:
         com.apple.security.app-sandbox: true
         com.apple.security.files.user-selected.read-only: true

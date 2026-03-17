@@ -1,8 +1,11 @@
 import SwiftData
 import SwiftUI
+#if os(macOS)
+import AppKit
+#endif
 
 @main
-struct SummarizeContentApp: App {
+struct RecallApp: App {
 
     @State private var transcriptionService = TranscriptionService()
     @State private var audioExtractionService = AudioExtractionService()
@@ -15,6 +18,11 @@ struct SummarizeContentApp: App {
     let modelContainer: ModelContainer
 
     init() {
+#if os(macOS)
+        NSApplication.shared.setActivationPolicy(.regular)
+        NSApplication.shared.activate(ignoringOtherApps: true)
+#endif
+
         let ts = TranscriptionService()
         let aes = AudioExtractionService()
         let llm = LLMService()

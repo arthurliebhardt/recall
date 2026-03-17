@@ -26,7 +26,7 @@
 		7780E221D511CF6FE483DBB0 /* AudioPlayerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F311966E66774BAD583C86BF /* AudioPlayerService.swift */; };
 		8AA4926954D243F6449E8F75 /* TranscriptionDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1577D716B63107EA8F2DCCAD /* TranscriptionDetailView.swift */; };
 		8B5709C9FF8423F9577AA481 /* MLXLMCommon in Frameworks */ = {isa = PBXBuildFile; productRef = D1D91DF1764FDAF8D337945F /* MLXLMCommon */; };
-		9C862F0A112BF4FB78FE8999 /* SummarizeContentApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AF853B613C85626B9710540 /* SummarizeContentApp.swift */; };
+		9C862F0A112BF4FB78FE8999 /* RecallApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AF853B613C85626B9710540 /* RecallApp.swift */; };
 		A534DE292E7285EB40B0F6EC /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4C616898C25B49473567D34 /* ContentView.swift */; };
 		CC10F5B2AE2DCCEC4386E9B2 /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = FA1BC2005EEA89CBB37B176A /* FluidAudio */; };
 		D4F8B213F31DFC694F03D694 /* ChatBubbleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7AAA636C707B41852ED1DE3 /* ChatBubbleView.swift */; };
@@ -43,8 +43,8 @@
 		138E359207E4E93A26642EBA /* SummarizeContent.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SummarizeContent.entitlements; sourceTree = "<group>"; };
 		1577D716B63107EA8F2DCCAD /* TranscriptionDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionDetailView.swift; sourceTree = "<group>"; };
 		1D7753964E474BC4FE1D25C7 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
-		36FAB762441DA145C192DC6F /* SummarizeContent.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SummarizeContent.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		3AF853B613C85626B9710540 /* SummarizeContentApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SummarizeContentApp.swift; sourceTree = "<group>"; };
+		36FAB762441DA145C192DC6F /* recall.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = recall.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		3AF853B613C85626B9710540 /* RecallApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecallApp.swift; sourceTree = "<group>"; };
 		43AC1CEC76E1028BD7F54FE7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		59771F7C7B6EE7FFF02AC631 /* ModelLoadingOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelLoadingOverlay.swift; sourceTree = "<group>"; };
 		A2B3C4D5E6F70819304152AB /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
@@ -130,7 +130,7 @@
 			path = Models;
 			sourceTree = "<group>";
 		};
-		8C450DEFF83195AA7ABD97FE /* SummarizeContent */ = {
+		8C450DEFF83195AA7ABD97FE /* recall */ = {
 			isa = PBXGroup;
 			children = (
 				AABB0011CCDD2233EEFF4456 /* AppIcon.icns */,
@@ -138,19 +138,19 @@
 				D4C616898C25B49473567D34 /* ContentView.swift */,
 				F3D511C6666F352008F16CDE /* Info.plist */,
 				138E359207E4E93A26642EBA /* SummarizeContent.entitlements */,
-				3AF853B613C85626B9710540 /* SummarizeContentApp.swift */,
+				3AF853B613C85626B9710540 /* RecallApp.swift */,
 				73E790CCBF038818416A8554 /* Models */,
 				9B7F6C355C3D323790100A96 /* Services */,
 				AD7C51A39064E17F95E36FED /* ViewModels */,
 				2E2E65EF8591AB8A8E7C87F4 /* Views */,
 			);
-			path = SummarizeContent;
+			path = recall;
 			sourceTree = "<group>";
 		};
 		8DCC4B4F351C822846966A32 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				36FAB762441DA145C192DC6F /* SummarizeContent.app */,
+				36FAB762441DA145C192DC6F /* recall.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -181,7 +181,7 @@
 		DB01C48E5FFAF0F0486ACF3A = {
 			isa = PBXGroup;
 			children = (
-				8C450DEFF83195AA7ABD97FE /* SummarizeContent */,
+				8C450DEFF83195AA7ABD97FE /* recall */,
 				8DCC4B4F351C822846966A32 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -197,9 +197,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		D0A7B1338A3D47FB98FAC76B /* SummarizeContent */ = {
+		D0A7B1338A3D47FB98FAC76B /* recall */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 62EF5E0545710397BDA4BFAE /* Build configuration list for PBXNativeTarget "SummarizeContent" */;
+			buildConfigurationList = 62EF5E0545710397BDA4BFAE /* Build configuration list for PBXNativeTarget "recall" */;
 			buildPhases = (
 				D6F8126FDF54B28A311B6557 /* Sources */,
 				461769FB463266F08733F95D /* Resources */,
@@ -209,7 +209,7 @@
 			);
 			dependencies = (
 			);
-			name = SummarizeContent;
+			name = recall;
 			packageProductDependencies = (
 				D0FA97091B54FD84013E6350 /* WhisperKit */,
 				0BAC5C4C4F5048E03B6203F0 /* MLXLLM */,
@@ -217,8 +217,8 @@
 				FA1BC2005EEA89CBB37B176A /* FluidAudio */,
 				8B96791E2E94C9D678A328F7 /* YouTubeKit */,
 			);
-			productName = SummarizeContent;
-			productReference = 36FAB762441DA145C192DC6F /* SummarizeContent.app */;
+			productName = recall;
+			productReference = 36FAB762441DA145C192DC6F /* recall.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -230,7 +230,7 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1600;
 			};
-			buildConfigurationList = ACB182F27C36AB0FC84582CD /* Build configuration list for PBXProject "SummarizeContent" */;
+			buildConfigurationList = ACB182F27C36AB0FC84582CD /* Build configuration list for PBXProject "recall" */;
 			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -250,7 +250,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				D0A7B1338A3D47FB98FAC76B /* SummarizeContent */,
+				D0A7B1338A3D47FB98FAC76B /* recall */,
 			);
 		};
 /* End PBXProject section */
@@ -286,7 +286,7 @@
 				A2B3C4D5E6F7081930415263 /* OnboardingView.swift in Sources */,
 				EDCD1FA8C8504307469199D7 /* SettingsView.swift in Sources */,
 				4D7A2A08D6191410E1B415DF /* SidebarView.swift in Sources */,
-				9C862F0A112BF4FB78FE8999 /* SummarizeContentApp.swift in Sources */,
+				9C862F0A112BF4FB78FE8999 /* RecallApp.swift in Sources */,
 				8AA4926954D243F6449E8F75 /* TranscriptionDetailView.swift in Sources */,
 				20C4E0776C9CAB07FE7F8514 /* TranscriptionRecord.swift in Sources */,
 				2EAFD01088B97BCFECD7CB78 /* TranscriptionService.swift in Sources */,
@@ -359,11 +359,11 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = "";
-				CODE_SIGN_ENTITLEMENTS = SummarizeContent/SummarizeContent.entitlements;
+				CODE_SIGN_ENTITLEMENTS = recall/SummarizeContent.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_HARDENED_RUNTIME = YES;
-				INFOPLIST_FILE = SummarizeContent/Info.plist;
+				INFOPLIST_FILE = recall/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -371,7 +371,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.summarizecontent.app;
-				PRODUCT_NAME = "recall.";
+					PRODUCT_NAME = recall;
 				SDKROOT = macosx;
 				SWIFT_VERSION = 5.9;
 			};
@@ -444,11 +444,11 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = "";
-				CODE_SIGN_ENTITLEMENTS = SummarizeContent/SummarizeContent.entitlements;
+				CODE_SIGN_ENTITLEMENTS = recall/SummarizeContent.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_HARDENED_RUNTIME = YES;
-				INFOPLIST_FILE = SummarizeContent/Info.plist;
+				INFOPLIST_FILE = recall/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -456,7 +456,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.summarizecontent.app;
-				PRODUCT_NAME = "recall.";
+					PRODUCT_NAME = recall;
 				SDKROOT = macosx;
 				SWIFT_VERSION = 5.9;
 			};
@@ -465,7 +465,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		62EF5E0545710397BDA4BFAE /* Build configuration list for PBXNativeTarget "SummarizeContent" */ = {
+		62EF5E0545710397BDA4BFAE /* Build configuration list for PBXNativeTarget "recall" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				71E0D8F2392B7A9C48641D91 /* Debug */,
@@ -474,7 +474,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
-		ACB182F27C36AB0FC84582CD /* Build configuration list for PBXProject "SummarizeContent" */ = {
+		ACB182F27C36AB0FC84582CD /* Build configuration list for PBXProject "recall" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				B3304E9A70263F746ECD46A1 /* Debug */,
