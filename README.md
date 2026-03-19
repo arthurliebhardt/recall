@@ -46,6 +46,22 @@ Video files are converted to audio automatically before transcription.
 
 ## Getting Started
 
+### Install the latest release
+
+```bash
+./install.sh
+```
+
+Run that from a local checkout of the repository. The installer downloads the latest macOS release zip automatically. If the repo is private, install with authenticated `gh` access so the release download can resolve.
+
+If you already downloaded a release zip, you can install that directly instead:
+
+```bash
+./install.sh /path/to/recall-v1.0.0-macos.zip
+```
+
+The installer places `recall.app` in `/Applications` when writable, otherwise `~/Applications`. It also migrates existing legacy `default.store` and `AudioFiles` data into the sandbox container when needed.
+
 ### Build in Xcode
 
 1. Clone the repository.
