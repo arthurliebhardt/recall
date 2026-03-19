@@ -120,18 +120,26 @@ struct ContentView: View {
         }
         .task(id: hasCompletedOnboarding) {
             guard hasCompletedOnboarding else { return }
+            let resolvedLLMModel = LLMService.resolvePersistedModelId(savedLLMModel)
+            if savedLLMModel != resolvedLLMModel {
+                savedLLMModel = resolvedLLMModel
+            }
+            let shouldLoadWhisper = !transcriptionService.modelState.isReady
+            let shouldLoadLLM = !llmService.modelState.isReady
+            let shouldPrepareDiarization = !diarizationService.modelState.isReady
+
             async let whisper: Void = {
-                if !transcriptionService.modelState.isReady {
+                if shouldLoadWhisper {
                     await transcriptionService.loadModel(savedWhisperModel)
                 }
             }()
             async let llm: Void = {
-                if !llmService.modelState.isReady {
-                    await llmService.loadModel(savedLLMModel)
+                if shouldLoadLLM {
+                    await llmService.loadModel(resolvedLLMModel)
                 }
             }()
             async let diarization: Void = {
-                if !diarizationService.modelState.isReady {
+                if shouldPrepareDiarization {
                     await diarizationService.prepareModels()
                 }
             }()

@@ -1,6 +1,12 @@
 import SwiftUI
 
 struct OnboardingView: View {
+    private struct CachedModel: Identifiable {
+        let id: String
+        let size: String
+        let recommendedRAM: String
+    }
+
     @Environment(TranscriptionService.self) private var transcriptionService
 
     @AppStorage("whisperModel") private var savedWhisperModel = TranscriptionService.defaultModel
@@ -13,7 +19,7 @@ struct OnboardingView: View {
     @State private var manualModelText = ""
     @State private var customIsManual = false
     @State private var availableWhisperModels: [String] = []
-    @State private var cachedModels: [(id: String, size: String)] = []
+    @State private var cachedModels: [CachedModel] = []
     @State private var selectedCachedModel: String = ""
     private let manualEntryTag = "_manual_"
 
@@ -178,6 +184,9 @@ struct OnboardingView: View {
                                 Text("\(model.id) — \(model.size)")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
+                                Text("Recommended RAM: \(model.recommendedRAM)")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
                             }
                             Spacer()
                         }
@@ -225,9 +234,9 @@ struct OnboardingView: View {
                     .font(.title3.weight(.semibold))
 
                 Picker("Select a model", selection: llmPickerSelection) {
-                    Text("Qwen 3.5 9B (Default)").tag(LLMService.defaultModelId)
+                    Text("Qwen 3 4B (Default • \(LLMService.recommendedRAM(for: LLMService.defaultModelId)) RAM)").tag(LLMService.defaultModelId)
                     ForEach(Self.otherLLMs, id: \.id) { model in
-                        Text("\(shortModelName(model.id))  (\(model.size))").tag(model.id)
+                        Text("\(shortModelName(model.id))  (\(model.size), \(LLMService.recommendedRAM(for: model.id)) RAM)").tag(model.id)
                     }
                     Divider()
                     Text("Enter manually…").tag(manualEntryTag)
@@ -308,7 +317,12 @@ struct OnboardingView: View {
     }
 
     private func configureInitialLLMSelection() {
-        if savedLLMModel == LLMService.defaultModelId {
+        let resolvedLLMModel = LLMService.resolvePersistedModelId(savedLLMModel)
+        if savedLLMModel != resolvedLLMModel {
+            savedLLMModel = resolvedLLMModel
+        }
+
+        if resolvedLLMModel == LLMService.defaultModelId {
             llmSelection = .defaultModel
             customPickerSelection = ""
             manualModelText = ""
@@ -317,13 +331,13 @@ struct OnboardingView: View {
         }
 
         llmSelection = .custom
-        if Self.otherLLMs.contains(where: { $0.id == savedLLMModel }) {
-            customPickerSelection = savedLLMModel
+        if Self.otherLLMs.contains(where: { $0.id == resolvedLLMModel }) {
+            customPickerSelection = resolvedLLMModel
             manualModelText = ""
             customIsManual = false
         } else {
             customPickerSelection = manualEntryTag
-            manualModelText = savedLLMModel
+            manualModelText = resolvedLLMModel
             customIsManual = true
         }
     }
@@ -347,7 +361,7 @@ struct OnboardingView: View {
             options: .skipsHiddenFiles
         ) else { return }
 
-        var found: [(id: String, size: String)] = []
+        var found: [CachedModel] = []
         for entry in entries {
             guard (try? entry.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true else { continue }
             let configFile = entry.appendingPathComponent("config.json")
@@ -359,7 +373,16 @@ struct OnboardingView: View {
 
             let folderSize = directorySize(at: entry, fm: fm)
             let sizeStr = ByteCountFormatter.string(fromByteCount: folderSize, countStyle: .file)
-            found.append((id: entry.lastPathComponent, size: sizeStr))
+            found.append(
+                CachedModel(
+                    id: entry.lastPathComponent,
+                    size: sizeStr,
+                    recommendedRAM: LLMService.recommendedRAM(
+                        for: "mlx-community/\(entry.lastPathComponent)",
+                        sizeBytes: folderSize
+                    )
+                )
+            )
         }
         cachedModels = found.sorted { $0.id < $1.id }
     }

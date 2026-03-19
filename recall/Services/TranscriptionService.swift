@@ -40,15 +40,18 @@ final class TranscriptionService {
         }
     }
 
-    /// Default model: OpenAI's turbo variant (4 decoder layers instead of 32 = ~4-8x faster)
-    /// with WhisperKit's Neural Engine optimized build
-    static let defaultModel = "openai_whisper-large-v3-v20240930_turbo"
+    nonisolated static let defaultModel = WhisperKit.recommendedModels().default
     private static var huggingFaceCacheDirectory: URL {
         let cachesDirectory = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
         let directory = cachesDirectory.appendingPathComponent("huggingface", isDirectory: true)
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         return directory
     }
+    private static let requiredModelComponents = [
+        "AudioEncoder.mlmodelc",
+        "MelSpectrogram.mlmodelc",
+        "TextDecoder.mlmodelc",
+    ]
 
     private(set) var modelState: ModelState = .notLoaded
     private(set) var transcriptionProgress: Double = 0
@@ -59,32 +62,45 @@ final class TranscriptionService {
     // MARK: - Model Management
 
     func loadModel(_ variant: String = defaultModel) async {
+        let supportedModels = Set(WhisperKit.recommendedModels().supported)
+        let resolvedVariant = supportedModels.contains(variant) ? variant : Self.defaultModel
+        if resolvedVariant != variant {
+            logger.notice("[WhisperKit] Falling back from unsupported model \(variant) to \(resolvedVariant)")
+        }
+
         modelState = .downloading(0)
-        logger.notice("[WhisperKit] Starting to load model: \(variant)")
+        logger.notice("[WhisperKit] Starting to load model: \(resolvedVariant)")
 
         do {
-            // Download the model with progress tracking
-            logger.notice("[WhisperKit] Downloading model files...")
-            let modelFolder = try await WhisperKit.download(
-                variant: variant,
-                downloadBase: Self.huggingFaceCacheDirectory,
-                progressCallback: { [weak self] progress in
-                    Task { @MainActor [weak self] in
-                        self?.modelState = .downloading(progress.fractionCompleted)
+            let modelFolder: URL
+            if let cachedModelFolder = Self.cachedModelFolder(for: resolvedVariant) {
+                logger.notice("[WhisperKit] Reusing cached model at: \(cachedModelFolder.path)")
+                modelFolder = cachedModelFolder
+            } else {
+                // Download the model with progress tracking only when the cache is incomplete.
+                logger.notice("[WhisperKit] Downloading model files...")
+                modelFolder = try await WhisperKit.download(
+                    variant: resolvedVariant,
+                    downloadBase: Self.huggingFaceCacheDirectory,
+                    progressCallback: { [weak self] progress in
+                        Task { @MainActor [weak self] in
+                            self?.modelState = .downloading(progress.fractionCompleted)
+                        }
                     }
-                }
-            )
-            logger.notice("[WhisperKit] Download complete at: \(modelFolder.path)")
+                )
+                logger.notice("[WhisperKit] Download complete at: \(modelFolder.path)")
+            }
 
-            // Load the model with optimal compute options for Apple Silicon
+            // Neural Engine specialization can stall for minutes on some macOS setups.
+            // Favor GPU-backed loading here so the first startup is predictable.
             modelState = .loading
-            logger.notice("[WhisperKit] Loading model into memory...")
+            logger.notice("[WhisperKit] Loading model into memory with GPU-backed compute...")
             let config = WhisperKitConfig(
                 modelFolder: modelFolder.path,
                 computeOptions: ModelComputeOptions(
                     melCompute: .cpuAndGPU,
-                    audioEncoderCompute: .cpuAndNeuralEngine,
-                    textDecoderCompute: .cpuAndNeuralEngine,
+                    audioEncoderCompute: .cpuAndGPU,
+                    textDecoderCompute: .cpuAndGPU,
                     prefillCompute: .cpuOnly
                 ),
                 verbose: false,
@@ -93,7 +109,7 @@ final class TranscriptionService {
             let kit = try await WhisperKit(config)
             logger.notice("[WhisperKit] WhisperKit initialized successfully")
             self.whisperKit = kit
-            modelState = .loaded(variant)
+            modelState = .loaded(resolvedVariant)
         } catch {
             logger.notice("[WhisperKit] Error loading model: \(error)")
             modelState = .error(error.localizedDescription)
@@ -120,6 +136,23 @@ final class TranscriptionService {
     func recommendedModels() -> (defaultModel: String, supported: [String]) {
         let rec = WhisperKit.recommendedModels()
         return (rec.default, rec.supported)
+    }
+
+    private static func cachedModelFolder(for variant: String) -> URL? {
+        let modelFolder = huggingFaceCacheDirectory
+            .appendingPathComponent("models/argmaxinc/whisperkit-coreml", isDirectory: true)
+            .appendingPathComponent(variant, isDirectory: true)
+        let configFile = modelFolder.appendingPathComponent("config.json")
+
+        guard FileManager.default.fileExists(atPath: configFile.path) else {
+            return nil
+        }
+
+        let hasAllCoreComponents = requiredModelComponents.allSatisfy { component in
+            FileManager.default.fileExists(atPath: modelFolder.appendingPathComponent(component).path)
+        }
+
+        return hasAllCoreComponents ? modelFolder : nil
     }
 
     /// Strip Whisper special tokens like <|startoftranscript|>, <|en|>, <|0.00|>, etc.

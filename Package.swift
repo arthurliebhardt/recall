@@ -14,7 +14,7 @@ let package = Package(
         .package(url: "https://github.com/argmaxinc/WhisperKit", exact: "0.15.0"),
         .package(url: "https://github.com/ml-explore/mlx-swift-lm", revision: "a3e1bf49f6f44d0e9cba29f1c4a61576f646a1b4"),
         .package(url: "https://github.com/FluidInference/FluidAudio.git", exact: "0.12.1"),
-        .package(url: "https://github.com/alexeichhorn/YouTubeKit", revision: "0c191b005b370dcd5645dbe183e0865ce4de9b95"),
+        .package(url: "https://github.com/alexeichhorn/YouTubeKit", revision: "4140995e3485cd691fadb67b2820dbab2d3d84e9"),
     ],
     targets: [
         .executableTarget(

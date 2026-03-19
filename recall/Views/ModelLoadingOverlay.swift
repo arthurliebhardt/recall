@@ -91,7 +91,11 @@ struct ModelLoadingOverlay: View {
         switch whisperState {
         case .notLoaded: return "Waiting..."
         case .downloading(let p): return "Downloading \(Int(p * 100))%"
-        case .loading: return "Loading into memory..."
+        case .loading:
+            if elapsedSeconds >= 15 {
+                return "Specializing for your Mac. First load can take a while."
+            }
+            return "Loading into memory..."
         case .loaded(let m): return shortModelName(m)
         case .error(let e): return e
         }
@@ -118,6 +122,7 @@ struct ModelLoadingOverlay: View {
     private var llmDetail: String {
         switch llmState {
         case .notLoaded: return "Waiting..."
+        case .preparing(_, let message): return message
         case .downloading(let p): return "Downloading \(Int(p * 100))%"
         case .loading: return "Loading into memory..."
         case .loaded(let m): return shortModelName(m)
@@ -126,11 +131,13 @@ struct ModelLoadingOverlay: View {
     }
 
     private var llmProgress: Double? {
+        if case .preparing(let p, _) = llmState { return p }
         if case .downloading(let p) = llmState { return p }
         return nil
     }
 
     private var llmIsLoading: Bool {
+        if case .preparing = llmState { return true }
         if case .loading = llmState { return true }
         if case .downloading = llmState { return true }
         return false
@@ -216,7 +223,7 @@ private struct ModelRow: View {
                 Text(detail)
                     .font(.caption)
                     .foregroundStyle(isError ? .red : .secondary)
-                    .lineLimit(1)
+                    .lineLimit(2)
             }
 
             Spacer()

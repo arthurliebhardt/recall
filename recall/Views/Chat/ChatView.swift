@@ -105,6 +105,15 @@ private struct ModelStatusBar: View {
                 Spacer()
                 Text("Open Settings to load a model")
                     .font(.caption)
+            case .preparing(let progress, let message):
+                if let progress {
+                    ProgressView(value: progress)
+                        .frame(width: 100)
+                } else {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+                Text(message)
             case .downloading(let progress):
                 ProgressView(value: progress)
                     .frame(width: 100)

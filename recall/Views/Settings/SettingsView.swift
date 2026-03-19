@@ -34,7 +34,11 @@ struct SettingsView: View {
         .task {
             availableWhisperModels = await transcriptionService.fetchAvailableModels()
             selectedWhisperModel = savedWhisperModel
-            selectedLLMModel = savedLLMModel
+            let resolvedLLMModel = LLMService.resolvePersistedModelId(savedLLMModel)
+            if savedLLMModel != resolvedLLMModel {
+                savedLLMModel = resolvedLLMModel
+            }
+            selectedLLMModel = resolvedLLMModel
         }
     }
 
@@ -94,9 +98,11 @@ struct SettingsView: View {
 
                 HStack {
                     Button("Load Model") {
-                        savedLLMModel = selectedLLMModel
+                        let resolvedLLMModel = LLMService.normalizeModelId(selectedLLMModel)
+                        savedLLMModel = resolvedLLMModel
+                        selectedLLMModel = resolvedLLMModel
                         Task {
-                            await llmService.loadModel(selectedLLMModel)
+                            await llmService.loadModel(resolvedLLMModel)
                         }
                     }
                     .disabled(llmService.modelState.isReady
@@ -112,9 +118,9 @@ struct SettingsView: View {
 
             Section("Suggested Models") {
                 VStack(alignment: .leading, spacing: 4) {
-                    modelSuggestion(LLMService.defaultModelId, size: "Default")
-                    modelSuggestion("mlx-community/Llama-3.2-3B-Instruct-4bit", size: "Smaller alternative")
-                    modelSuggestion("mlx-community/Qwen3-14B-4bit", size: "Larger alternative")
+                    modelSuggestion(LLMService.defaultModelId, note: "Default")
+                    modelSuggestion("mlx-community/Llama-3.2-3B-Instruct-4bit", note: "Smaller alternative")
+                    modelSuggestion("mlx-community/Qwen3-8B-4bit", note: "Larger alternative")
                 }
             }
 
@@ -206,6 +212,20 @@ struct SettingsView: View {
         case .notLoaded:
             Label("Not loaded", systemImage: "circle")
                 .foregroundStyle(.secondary)
+        case .preparing(let progress, let message):
+            if let progress {
+                HStack {
+                    ProgressView(value: progress)
+                        .frame(width: 150)
+                    Text(message)
+                        .lineLimit(2)
+                }
+            } else {
+                HStack {
+                    ProgressView().controlSize(.small)
+                    Text(message)
+                }
+            }
         case .downloading(let progress):
             HStack {
                 ProgressView(value: progress)
@@ -226,12 +246,12 @@ struct SettingsView: View {
         }
     }
 
-    private func modelSuggestion(_ id: String, size: String) -> some View {
+    private func modelSuggestion(_ id: String, note: String) -> some View {
         HStack {
             VStack(alignment: .leading) {
                 Text(id)
                     .font(.caption.monospaced())
-                Text(size)
+                Text("\(note) • Recommended RAM: \(LLMService.recommendedRAM(for: id))")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }

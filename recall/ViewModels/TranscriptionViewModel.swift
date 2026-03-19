@@ -7,11 +7,37 @@ import SwiftUI
 final class TranscriptionViewModel {
 
     enum ImportState: Equatable {
+        case fetchingYouTubeTranscript
         case downloadingYouTube(Double)
         case extractingAudio
         case transcribing(Double)
         case diarizing
         case saving
+    }
+
+    enum YouTubeImportMode: String, CaseIterable, Identifiable {
+        case transcriptOnly
+        case withAudioPlayback
+
+        var id: Self { self }
+
+        var title: String {
+            switch self {
+            case .transcriptOnly:
+                return "Transcript Only"
+            case .withAudioPlayback:
+                return "With Audio Playback"
+            }
+        }
+
+        var detail: String {
+            switch self {
+            case .transcriptOnly:
+                return "Fastest path. Imports captions only and skips the audio download."
+            case .withAudioPlayback:
+                return "Downloads audio so playback works. Falls back to Whisper if captions are unavailable."
+            }
+        }
     }
 
     struct ImportJob: Identifiable {
@@ -129,71 +155,111 @@ final class TranscriptionViewModel {
         }
     }
 
-    /// Import audio from a YouTube URL: download + fetch captions in parallel → use captions or fall back to Whisper → diarize → save
-    func importYouTubeURL(_ url: URL, modelContext: ModelContext) {
+    /// Import a YouTube URL using either transcript-only or audio-backed flow.
+    func importYouTubeURL(_ url: URL, mode: YouTubeImportMode, modelContext: ModelContext) {
         let normalizedURL = YouTubeService.normalizedYouTubeURL(url.absoluteString) ?? url
         let jobID = UUID()
-        let job = ImportJob(id: jobID, title: "YouTube video", state: .downloadingYouTube(0))
+        let initialState: ImportState = switch mode {
+        case .transcriptOnly:
+            .fetchingYouTubeTranscript
+        case .withAudioPlayback:
+            .downloadingYouTube(0)
+        }
+        let job = ImportJob(id: jobID, title: "YouTube video", state: initialState)
         importJobs.append(job)
 
         let task = Task { [weak self] in
             guard let self else { return }
 
             do {
-                // Step 1: Download audio and fetch captions in parallel
-                let progressTask = Task {
-                    while !Task.isCancelled {
-                        try await Task.sleep(for: .milliseconds(100))
-                        let progress = await self.youTubeService.downloadProgress
-                        if let idx = self.importJobs.firstIndex(where: { $0.id == jobID }),
-                           case .downloadingYouTube = self.importJobs[idx].state {
-                            self.importJobs[idx].state = .downloadingYouTube(progress)
+                let audioURL: URL?
+                let duration: TimeInterval
+                let title: String
+                var segments: [TranscriptionSegment]
+                var fullText: String
+
+                switch mode {
+                case .transcriptOnly:
+                    guard let captions = await self.fetchCaptionsWithTimeout(from: normalizedURL) else {
+                        throw NSError(
+                            domain: "YouTubeImport",
+                            code: 3,
+                            userInfo: [
+                                NSLocalizedDescriptionKey: "No transcript was available for this video. Re-import with audio playback if you want to download the audio and transcribe it."
+                            ]
+                        )
+                    }
+
+                    title = captions.title ?? "YouTube Video"
+                    duration = captions.duration ?? Self.captionDuration(captions)
+                    segments = captions.segments
+                    fullText = captions.fullText
+                    audioURL = nil
+                case .withAudioPlayback:
+                    let progressTask = Task {
+                        while !Task.isCancelled {
+                            try await Task.sleep(for: .milliseconds(100))
+                            let progress = self.youTubeService.downloadProgress
+                            if let idx = self.importJobs.firstIndex(where: { $0.id == jobID }),
+                               case .downloadingYouTube = self.importJobs[idx].state {
+                                self.importJobs[idx].state = .downloadingYouTube(progress)
+                            }
                         }
                     }
+                    defer { progressTask.cancel() }
+
+                    async let captionResult = self.fetchCaptionsWithTimeout(from: normalizedURL)
+
+                    let rawAudioURL: URL
+                    let downloadedTitle: String
+                    do {
+                        let result = try await self.youTubeService.downloadAudio(from: normalizedURL)
+                        rawAudioURL = result.audioURL
+                        downloadedTitle = result.title
+                    } catch {
+                        throw NSError(
+                            domain: "YouTubeImport",
+                            code: 1,
+                            userInfo: [
+                                NSLocalizedDescriptionKey: error.localizedDescription
+                            ]
+                        )
+                    }
+
+                    title = downloadedTitle.isEmpty ? "YouTube Video" : downloadedTitle
+
+                    // Step 2: Re-export through AVFoundation to normalize the audio format
+                    self.updateJob(jobID, state: .extractingAudio)
+                    let normalizedAudioURL = try await self.audioExtractionService.reExportAudio(from: rawAudioURL)
+                    try? FileManager.default.removeItem(at: rawAudioURL)
+                    audioURL = normalizedAudioURL
+
+                    // Step 3: Get duration
+                    duration = try await self.audioExtractionService.getDuration(of: normalizedAudioURL)
+
+                    if let captions = await captionResult {
+                        segments = captions.segments
+                        fullText = captions.fullText
+                    } else {
+                        guard self.transcriptionService.modelState.isReady else {
+                            self.removeJob(jobID)
+                            self.latestError = "No captions available and Whisper model is not loaded. Please load a model in Settings first."
+                            try? FileManager.default.removeItem(at: normalizedAudioURL)
+                            return
+                        }
+                        self.updateJob(jobID, state: .transcribing(0))
+                        let result = try await self.transcriptionService.transcribe(audioPath: normalizedAudioURL.path)
+                        segments = result.segments
+                        fullText = result.fullText
+                    }
                 }
-                defer { progressTask.cancel() }
 
-                async let captionResult = self.fetchCaptionsWithTimeout(from: normalizedURL)
-                async let audioResult = self.youTubeService.downloadAudio(from: normalizedURL)
-
-                let (rawAudioURL, title) = try await audioResult
-                let captions = await captionResult
-
-                // Update the job title now that we know it
                 if let idx = self.importJobs.firstIndex(where: { $0.id == jobID }) {
                     self.importJobs[idx].title = title
                 }
 
-                // Step 2: Re-export through AVFoundation to normalize the audio format
-                self.updateJob(jobID, state: .extractingAudio)
-                let audioURL = try await self.audioExtractionService.reExportAudio(from: rawAudioURL)
-                try? FileManager.default.removeItem(at: rawAudioURL)
-
-                // Step 3: Get duration
-                let duration = try await self.audioExtractionService.getDuration(of: audioURL)
-
-                // Step 4: Get transcript — use captions (fast path) or fall back to Whisper (slow path)
-                var segments: [TranscriptionSegment]
-                var fullText: String
-
-                if let captions {
-                    segments = captions.segments
-                    fullText = captions.fullText
-                } else {
-                    guard self.transcriptionService.modelState.isReady else {
-                        self.removeJob(jobID)
-                        self.latestError = "No captions available and Whisper model is not loaded. Please load a model in Settings first."
-                        try? FileManager.default.removeItem(at: audioURL)
-                        return
-                    }
-                    self.updateJob(jobID, state: .transcribing(0))
-                    let result = try await self.transcriptionService.transcribe(audioPath: audioURL.path)
-                    segments = result.segments
-                    fullText = result.fullText
-                }
-
                 // Step 5: Speaker diarization
-                if self.diarizationService.modelState.isReady {
+                if let audioURL, self.diarizationService.modelState.isReady {
                     self.updateJob(jobID, state: .diarizing)
                     let speakerSegments = try await self.diarizationService.diarize(audioPath: audioURL.path)
                     if !speakerSegments.isEmpty {
@@ -206,7 +272,7 @@ final class TranscriptionViewModel {
 
                 // Step 6: Copy audio into sandbox for playback
                 self.updateJob(jobID, state: .saving)
-                let localAudioPath = try self.copyFileToSandbox(audioURL)
+                let localAudioPath = try audioURL.map(self.copyFileToSandbox)
 
                 // Step 7: Save to SwiftData
                 let record = TranscriptionRecord(
@@ -226,7 +292,9 @@ final class TranscriptionViewModel {
                 }
 
                 // Clean up temp file
-                try? FileManager.default.removeItem(at: audioURL)
+                if let audioURL {
+                    try? FileManager.default.removeItem(at: audioURL)
+                }
             } catch {
                 if Task.isCancelled { return }
                 self.removeJob(jobID)
@@ -283,6 +351,10 @@ final class TranscriptionViewModel {
             group.cancelAll()
             return first
         }
+    }
+
+    private static func captionDuration(_ captions: YouTubeCaptionResult) -> TimeInterval {
+        captions.segments.map(\.endTime).max() ?? 0
     }
 
     // MARK: - Speaker Label Merge

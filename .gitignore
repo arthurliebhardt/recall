@@ -1,2 +1,13 @@
+.DS_Store
+
+# SwiftPM
 .build/
 .swiftpm/
+
+# Local Xcode outputs
+build/
+DerivedData/
+**/xcuserdata/
+
+# Local Codex state
+.codex/environments/

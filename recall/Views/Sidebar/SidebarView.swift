@@ -119,6 +119,7 @@ private struct YouTubeImportPopover: View {
     @Environment(\.modelContext) private var modelContext
     @Binding var urlText: String
     @Binding var isPresented: Bool
+    @State private var importMode: TranscriptionViewModel.YouTubeImportMode = .transcriptOnly
 
     private var isValidURL: Bool {
         YouTubeService.normalizedYouTubeURL(urlText) != nil
@@ -133,6 +134,25 @@ private struct YouTubeImportPopover: View {
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 320)
                 .onSubmit { importIfValid() }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Import Mode")
+                    .font(.subheadline.weight(.medium))
+
+                Picker("Import Mode", selection: $importMode) {
+                    ForEach(TranscriptionViewModel.YouTubeImportMode.allCases) { mode in
+                        Text(mode.title).tag(mode)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.radioGroup)
+
+                Text(importMode.detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(width: 320, alignment: .leading)
 
             HStack {
                 Button("Cancel") {
@@ -153,8 +173,9 @@ private struct YouTubeImportPopover: View {
     private func importIfValid() {
         guard let url = YouTubeService.normalizedYouTubeURL(urlText) else { return }
         isPresented = false
-        transcriptionVM.importYouTubeURL(url, modelContext: modelContext)
+        transcriptionVM.importYouTubeURL(url, mode: importMode, modelContext: modelContext)
         urlText = ""
+        importMode = .transcriptOnly
     }
 }
 
@@ -192,6 +213,7 @@ private struct ImportJobRow: View {
 
     private var statusText: String {
         switch job.state {
+        case .fetchingYouTubeTranscript: return "Fetching transcript..."
         case .downloadingYouTube: return "Downloading..."
         case .extractingAudio: return "Extracting audio..."
         case .transcribing: return "Transcribing..."

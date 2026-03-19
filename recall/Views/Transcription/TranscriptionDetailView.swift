@@ -53,12 +53,26 @@ struct TranscriptionDetailView: View {
 
             // Playback controls
             if !record.segments.isEmpty {
-                PlaybackBar(
-                    record: record,
-                    audioPlayer: audioPlayer,
-                    isScrubbing: $isScrubbing,
-                    scrubTime: $scrubTime
-                )
+                if record.localAudioURL != nil {
+                    PlaybackBar(
+                        record: record,
+                        audioPlayer: audioPlayer,
+                        isScrubbing: $isScrubbing,
+                        scrubTime: $scrubTime
+                    )
+                } else {
+                    HStack(spacing: 8) {
+                        Image(systemName: "text.bubble")
+                            .foregroundStyle(.secondary)
+                        Text("Transcript imported without audio playback.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                    }
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+                    .background(.bar)
+                }
 
                 Divider()
             }
@@ -85,6 +99,7 @@ struct TranscriptionDetailView: View {
                                         isEditing: editingSegmentId == segment.id,
                                         editText: $editText,
                                         onWordTap: { word in
+                                            guard record.localAudioURL != nil else { return }
                                             audioPlayer.ensureLoaded(record)
                                             audioPlayer.seek(to: word.startTime)
                                             if !audioPlayer.isPlaying {
@@ -92,6 +107,7 @@ struct TranscriptionDetailView: View {
                                             }
                                         },
                                         onTimestampTap: {
+                                            guard record.localAudioURL != nil else { return }
                                             audioPlayer.ensureLoaded(record)
                                             audioPlayer.seek(to: segment.startTime)
                                             if !audioPlayer.isPlaying {

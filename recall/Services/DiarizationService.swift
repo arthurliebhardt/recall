@@ -97,10 +97,10 @@ final class DiarizationService {
         if shouldRunFallbackPass(
             durationSec: durationSec,
             segmentCount: result.segments.count,
-            uniqueSpeakerCount: speakerIds.count
+            effectiveSpeakerCount: bestCandidate.effectiveSpeakerCount
         ) {
             Self.writeDebugLog(
-                "Fallback diarization enabled: initial pass returned \(speakerIds.count) speaker(s), trying stricter thresholds \(Self.fallbackClusteringThresholds)"
+                "Fallback diarization enabled: initial pass returned rawSpeakers=\(speakerIds.count), effectiveSpeakers=\(bestCandidate.effectiveSpeakerCount); trying stricter thresholds \(Self.fallbackClusteringThresholds)"
             )
             for threshold in Self.fallbackClusteringThresholds {
                 do {
@@ -211,9 +211,12 @@ final class DiarizationService {
     private func shouldRunFallbackPass(
         durationSec: Double,
         segmentCount: Int,
-        uniqueSpeakerCount: Int
+        effectiveSpeakerCount: Int
     ) -> Bool {
-        durationSec >= 60.0 && segmentCount >= 3 && uniqueSpeakerCount <= 2
+        // Only retry with stricter clustering when the dominant outcome is still a single speaker.
+        // Running the fallback on already-separated 2-speaker audio tends to fragment one person
+        // into multiple labels (for example Speaker 2 / Speaker 3).
+        durationSec >= 60.0 && segmentCount >= 3 && effectiveSpeakerCount <= 1
     }
 
     private static func audioDurationSeconds(at url: URL) -> Double? {
