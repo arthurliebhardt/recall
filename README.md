@@ -1,41 +1,48 @@
 # recall
 
-`recall` is a local-first macOS app for turning long-form audio and video into searchable transcripts you can chat with.
+`recall` is a local-first macOS app for turning long audio and video into searchable transcripts you can chat with on-device.
 
-It uses WhisperKit for transcription, FluidAudio for speaker diarization, and Apple MLX models for transcript Q&A. Import a file from disk or a YouTube link, let the app transcribe it locally, then review the timeline, rename speakers, and ask follow-up questions in chat.
+It combines WhisperKit for transcription, FluidAudio for speaker diarization, and Apple MLX models for transcript Q&A. You can import files from disk or a YouTube link, review the transcript with synced playback, rename speakers, and ask follow-up questions without sending the transcript to a hosted LLM.
 
-## Features
+## Highlights
 
 - Local transcription on macOS with WhisperKit and Core ML
 - Optional speaker diarization for multi-speaker recordings
-- Built-in transcript chat powered by local MLX language models
-- Audio playback with transcript scrubbing and word-level seek
-- Import from local audio/video files
+- Local transcript chat powered by MLX language models
+- Synced playback with transcript scrubbing and timestamp seek
+- Import from local audio and video files
 - Import from YouTube URLs, with caption fast-path when available
 - Persistent transcript and chat history with SwiftData
-- Model selection during onboarding and in Settings
+- Cached model reuse so existing Whisper and MLX downloads are picked up automatically
+
+## Requirements
+
+- macOS 14 or newer
+- Xcode 16 or newer
+- Enough RAM and disk space for local models
+
+Recommended RAM for the default models:
+
+- `Qwen3-4B-4bit` (default): `16 GB`
+- `Qwen3-8B-4bit`: `24 GB`
+
+Notes:
+
+- The first launch can take a while because models may need to download.
+- Larger MLX models need more memory and will respond more slowly on smaller Macs.
+- YouTube import works best with `yt-dlp` available as a fallback:
+
+```bash
+brew install yt-dlp
+```
 
 ## Supported Inputs
-
-`recall` currently supports:
 
 - Audio: `mp3`, `wav`, `m4a`, `flac`
 - Video: `mp4`, `mov`
 - YouTube video URLs
 
 Video files are converted to audio automatically before transcription.
-
-## Requirements
-
-- macOS 14+
-- Xcode 16 or newer
-- Enough RAM and disk space for local models
-
-Notes:
-
-- Larger language models can require several GB of disk and memory.
-- YouTube import works best with `yt-dlp` installed as a fallback:
-  `brew install yt-dlp`
 
 ## Getting Started
 
@@ -54,27 +61,27 @@ xcodebuild -project recall.xcodeproj -scheme recall build
 
 ## First Launch
 
-On first launch, the app walks through model setup:
+On first launch, `recall` walks through model setup:
 
 1. Choose a Whisper model for transcription.
-2. Reuse an existing MLX model if one is already cached on your Mac, or pick a new one.
-3. Finish onboarding and let the app download/load the selected models.
+2. Reuse a cached MLX model if one already exists on your Mac, or download a new one.
+3. Finish onboarding and let the app prepare the selected models.
 
-After setup, `recall` will automatically reload your saved models on launch.
+The default LLM is `Qwen3-4B-4bit`, which is the safest choice for most Macs. If you want better answer quality and have more headroom, you can switch to a larger model later in Settings.
 
 ## Usage
 
 ### Import a local file
 
-- Click the `+` button in the sidebar
-- Choose `From File`
-- Pick an audio or video file
+1. Click the `+` button in the sidebar.
+2. Choose `From File`.
+3. Pick an audio or video file.
 
 ### Import from YouTube
 
-- Click the `+` button in the sidebar
-- Choose `YouTube Link`
-- Paste a valid YouTube URL
+1. Click the `+` button in the sidebar.
+2. Choose `YouTube Link`.
+3. Paste a valid YouTube URL.
 
 When captions are available, `recall` uses them first. Otherwise it falls back to local Whisper transcription after downloading audio.
 
@@ -99,7 +106,7 @@ Runs locally on your Mac:
 
 - Audio transcription
 - Speaker diarization
-- Transcript chat / generation
+- Transcript chat and generation
 - Transcript persistence
 
 Uses the network for:
@@ -110,7 +117,7 @@ Uses the network for:
 
 Important storage locations:
 
-- Whisper / Hugging Face downloads:
+- Whisper downloads:
   `~/Library/Caches/huggingface`
 - MLX language model cache:
   `~/Library/Caches/models/mlx-community`
@@ -121,7 +128,7 @@ Important storage locations:
 - SwiftData store:
   `~/Library/Application Support/default.store`
 
-Imported media is copied into the app's sandbox so playback continues to work after import.
+Imported media is copied into the app sandbox so playback keeps working after import.
 
 ## Tech Stack
 
@@ -146,23 +153,14 @@ Other top-level files:
 
 - `project.yml`: XcodeGen project definition
 - `Package.swift`: Swift Package definition for dependencies
-- `recall.xcodeproj`: current Xcode project
+- `recall.xcodeproj`: checked-in Xcode project
 
 ## Development Notes
 
 - The app target is macOS-only.
-- The project currently includes both `project.yml` and a checked-in Xcode project.
-- If you change project structure, prefer updating `project.yml` and regenerating the Xcode project with XcodeGen.
+- The repository includes both `project.yml` and a checked-in Xcode project.
+- If you change project structure, keep `project.yml` and `recall.xcodeproj` in sync.
 - Model downloads happen on first use, so a clean environment may take a while to become ready.
-- There are some existing Swift 6 concurrency warnings in the project, but the app builds successfully today.
-
-## Roadmap Ideas
-
-- Export transcripts in common formats
-- Search across transcripts
-- Better model management and cache cleanup
-- Batch imports
-- Richer prompt templates for transcript chat
 
 ## Contributing
 

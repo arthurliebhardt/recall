@@ -14,6 +14,7 @@
 		11CDDF79BF08E6F135B56C56 /* ChatViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CF19AFD9343A5D13A69E015 /* ChatViewModel.swift */; };
 		13085015265123E4888DB68B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 43AC1CEC76E1028BD7F54FE7 /* Assets.xcassets */; };
 		165E7D81129E425B93A8501D /* ModelLoadingOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59771F7C7B6EE7FFF02AC631 /* ModelLoadingOverlay.swift */; };
+		B6A7C8D9E0F1121314151617 /* MLXMetalBootstrap.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6A7C8D9E0F1121314151618 /* MLXMetalBootstrap.swift */; };
 		A2B3C4D5E6F7081930415263 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2B3C4D5E6F70819304152AB /* OnboardingView.swift */; };
 		20C4E0776C9CAB07FE7F8514 /* TranscriptionRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B50D40EFE7065E2A19985F6 /* TranscriptionRecord.swift */; };
 		2EAFD01088B97BCFECD7CB78 /* TranscriptionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2A3B37F05B2374E5BD631DC /* TranscriptionService.swift */; };
@@ -47,6 +48,7 @@
 		3AF853B613C85626B9710540 /* RecallApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecallApp.swift; sourceTree = "<group>"; };
 		43AC1CEC76E1028BD7F54FE7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		59771F7C7B6EE7FFF02AC631 /* ModelLoadingOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelLoadingOverlay.swift; sourceTree = "<group>"; };
+		B6A7C8D9E0F1121314151618 /* MLXMetalBootstrap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MLXMetalBootstrap.swift; sourceTree = "<group>"; };
 		A2B3C4D5E6F70819304152AB /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		5B50D40EFE7065E2A19985F6 /* TranscriptionRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionRecord.swift; sourceTree = "<group>"; };
 		5CF19AFD9343A5D13A69E015 /* ChatViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatViewModel.swift; sourceTree = "<group>"; };
@@ -162,6 +164,7 @@
 				F311966E66774BAD583C86BF /* AudioPlayerService.swift */,
 				E7C0EEA98636685C828658E5 /* DiarizationService.swift */,
 				83B88EEB17568271EC883FCC /* LLMService.swift */,
+				B6A7C8D9E0F1121314151618 /* MLXMetalBootstrap.swift */,
 				D2A3B37F05B2374E5BD631DC /* TranscriptionService.swift */,
 				A1B2C3D4E5F60718293041AB /* YouTubeCaptionService.swift */,
 				0E5E49B6B994EE18E6D163F2 /* YouTubeService.swift */,
@@ -282,6 +285,7 @@
 				A534DE292E7285EB40B0F6EC /* ContentView.swift in Sources */,
 				F606BB4E058AF2E4F6D96B2B /* DiarizationService.swift in Sources */,
 				3F3841867B6A834F4FF5576B /* LLMService.swift in Sources */,
+				B6A7C8D9E0F1121314151617 /* MLXMetalBootstrap.swift in Sources */,
 				165E7D81129E425B93A8501D /* ModelLoadingOverlay.swift in Sources */,
 				A2B3C4D5E6F7081930415263 /* OnboardingView.swift in Sources */,
 				EDCD1FA8C8504307469199D7 /* SettingsView.swift in Sources */,
