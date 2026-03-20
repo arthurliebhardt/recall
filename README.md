@@ -48,6 +48,8 @@ Video files are converted to audio automatically before transcription.
 
 ### Install the latest release
 
+Download the current macOS build directly: [recall-v1.0.0-macos.zip](https://github.com/arthurliebhardt/recall/releases/download/v1.0.0/recall-v1.0.0-macos.zip)
+
 ```bash
 ./install.sh
 ```
