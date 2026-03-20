@@ -51,10 +51,16 @@ Video files are converted to audio automatically before transcription.
 Download the current macOS build directly: [recall-v1.0.0-macos.zip](https://github.com/arthurliebhardt/recall/releases/download/v1.0.0/recall-v1.0.0-macos.zip)
 
 ```bash
-./install.sh
+curl -fsSL https://raw.githubusercontent.com/arthurliebhardt/recall/main/scripts/install.sh | bash
 ```
 
-Run that from a local checkout of the repository. The installer downloads the latest macOS release zip automatically. If the repo is private, install with authenticated `gh` access so the release download can resolve.
+That downloads and runs the installer directly. The installer then fetches the latest macOS release zip automatically.
+
+If the repo is private, the raw GitHub URL will not work without access. In that case, run the installer from a local checkout instead:
+
+```bash
+./install.sh
+```
 
 If you already downloaded a release zip, you can install that directly instead:
 
