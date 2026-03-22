@@ -9,11 +9,15 @@ struct OnboardingView: View {
 
     @Environment(TranscriptionService.self) private var transcriptionService
 
+    @AppStorage("transcriptionBackend") private var savedTranscriptionBackend = TranscriptionService.defaultBackend.rawValue
     @AppStorage("whisperModel") private var savedWhisperModel = TranscriptionService.defaultModel
+    @AppStorage("transcriptionPerformanceProfile") private var savedTranscriptionProfile = TranscriptionService.defaultPerformanceProfile.rawValue
     @AppStorage("llmModel") private var savedLLMModel = LLMService.defaultModelId
 
     @State private var step = 0
+    @State private var selectedBackend = TranscriptionService.defaultBackend
     @State private var selectedWhisperModel = TranscriptionService.defaultModel
+    @State private var selectedTranscriptionProfile = TranscriptionService.defaultPerformanceProfile
     @State private var llmSelection: LLMSelection = .defaultModel
     @State private var customPickerSelection = ""
     @State private var manualModelText = ""
@@ -79,10 +83,16 @@ struct OnboardingView: View {
         }
         .onAppear(perform: configureInitialLLMSelection)
         .task {
+            let resolvedBackend = TranscriptionService.resolveBackend(savedTranscriptionBackend)
+            if savedTranscriptionBackend != resolvedBackend.rawValue {
+                savedTranscriptionBackend = resolvedBackend.rawValue
+            }
+            selectedBackend = resolvedBackend
             let models = await transcriptionService.fetchAvailableModels()
             if !models.isEmpty {
                 availableWhisperModels = models
             }
+            selectedTranscriptionProfile = TranscriptionService.resolvePerformanceProfile(savedTranscriptionProfile)
         }
     }
 
@@ -122,20 +132,59 @@ struct OnboardingView: View {
                 .font(.system(size: 36))
                 .foregroundStyle(Color.accentColor)
 
-            Text("Transcription Model")
+            Text("Transcription Setup")
                 .font(.title2.weight(.semibold))
 
-            Text("Whisper converts speech to text. The turbo model is recommended for fast, accurate transcription.")
+            Text(transcriptionStepDescription)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
-            Picker("Model", selection: $selectedWhisperModel) {
-                ForEach(whisperModelOptions, id: \.self) { model in
-                    Text(model).tag(model)
+            if transcriptionService.availableBackends.count > 1 {
+                Picker("Engine", selection: $selectedBackend) {
+                    ForEach(transcriptionService.availableBackends) { backend in
+                        Text(backend.title).tag(backend)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .onChange(of: selectedBackend) { _, newValue in
+                    savedTranscriptionBackend = newValue.rawValue
                 }
             }
-            .labelsHidden()
+
+            if selectedBackend == .whisperKit {
+                Picker("Model", selection: $selectedWhisperModel) {
+                    ForEach(whisperModelOptions, id: \.self) { model in
+                        Text(model).tag(model)
+                    }
+                }
+                .labelsHidden()
+            } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    Label("Apple Speech uses your current system language.", systemImage: "globe")
+                        .font(.callout)
+                    Text("Speech assets will be downloaded automatically if this Mac doesn't have them yet.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Picker("Profile", selection: $selectedTranscriptionProfile) {
+                    ForEach(TranscriptionService.PerformanceProfile.allCases) { profile in
+                        Text(profile.title).tag(profile)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                Text(selectedTranscriptionProfile.detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             Button {
                 scanCachedModels()
@@ -199,6 +248,7 @@ struct OnboardingView: View {
             VStack(spacing: 8) {
                 Button {
                     savedWhisperModel = selectedWhisperModel
+                    savedTranscriptionProfile = selectedTranscriptionProfile.rawValue
                     savedLLMModel = "mlx-community/\(selectedCachedModel)"
                     onComplete()
                 } label: {
@@ -403,8 +453,19 @@ struct OnboardingView: View {
     }
 
     private func finishOnboarding() {
+        savedTranscriptionBackend = selectedBackend.rawValue
         savedWhisperModel = selectedWhisperModel
+        savedTranscriptionProfile = selectedTranscriptionProfile.rawValue
         savedLLMModel = llmSelection == .custom ? resolvedCustomModel : (llmSelection.modelId ?? LLMService.defaultModelId)
         onComplete()
+    }
+
+    private var transcriptionStepDescription: String {
+        switch selectedBackend {
+        case .appleSpeech:
+            return "Apple Speech uses the SpeechAnalyzer framework on macOS 26+ and keeps transcription fully on-device."
+        case .whisperKit:
+            return "Whisper converts speech to text locally on your Mac. The turbo model is recommended for fast, accurate transcription."
+        }
     }
 }

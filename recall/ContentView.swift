@@ -10,6 +10,7 @@ struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
 
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    @AppStorage("transcriptionBackend") private var savedTranscriptionBackend = TranscriptionService.defaultBackend.rawValue
     @AppStorage("whisperModel") private var savedWhisperModel = TranscriptionService.defaultModel
     @AppStorage("llmModel") private var savedLLMModel = LLMService.defaultModelId
 
@@ -110,27 +111,35 @@ struct ContentView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if !transcriptionService.modelState.isReady || !llmService.modelState.isReady || !diarizationService.modelState.isReady {
+            } else if !transcriptionService.isReadyForTranscription || !llmService.modelState.isReady || !diarizationService.modelState.isReady {
                 ModelLoadingOverlay(
-                    whisperState: transcriptionService.modelState,
+                    transcriptionBackend: transcriptionService.selectedBackend,
+                    transcriptionState: transcriptionService.modelState,
                     llmState: llmService.modelState,
                     diarizationState: diarizationService.modelState
                 )
             }
         }
-        .task(id: hasCompletedOnboarding) {
+        .task(id: startupConfigurationKey) {
             guard hasCompletedOnboarding else { return }
+
+            let resolvedBackend = TranscriptionService.resolveBackend(savedTranscriptionBackend)
+            if savedTranscriptionBackend != resolvedBackend.rawValue {
+                savedTranscriptionBackend = resolvedBackend.rawValue
+            }
+            await transcriptionService.setBackend(resolvedBackend)
+
             let resolvedLLMModel = LLMService.resolvePersistedModelId(savedLLMModel)
             if savedLLMModel != resolvedLLMModel {
                 savedLLMModel = resolvedLLMModel
             }
-            let shouldLoadWhisper = !transcriptionService.modelState.isReady
+            let shouldPrepareTranscription = !transcriptionService.isReadyForTranscription
             let shouldLoadLLM = !llmService.modelState.isReady
             let shouldPrepareDiarization = !diarizationService.modelState.isReady
 
-            async let whisper: Void = {
-                if shouldLoadWhisper {
-                    await transcriptionService.loadModel(savedWhisperModel)
+            async let transcription: Void = {
+                if shouldPrepareTranscription {
+                    await transcriptionService.prepareSelectedBackend(whisperVariant: savedWhisperModel)
                 }
             }()
             async let llm: Void = {
@@ -143,8 +152,17 @@ struct ContentView: View {
                     await diarizationService.prepareModels()
                 }
             }()
-            _ = await (whisper, llm, diarization)
+            _ = await (transcription, llm, diarization)
         }
+    }
+
+    private var startupConfigurationKey: String {
+        [
+            hasCompletedOnboarding ? "1" : "0",
+            savedTranscriptionBackend,
+            savedWhisperModel,
+            savedLLMModel,
+        ].joined(separator: "|")
     }
 
     private func handleDrop(_ providers: [NSItemProvider]) {

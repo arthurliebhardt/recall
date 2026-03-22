@@ -76,8 +76,8 @@ final class TranscriptionViewModel {
             return
         }
 
-        guard transcriptionService.modelState.isReady else {
-            latestError = "Whisper model is not loaded. Please load a model in Settings first."
+        guard transcriptionService.isReadyForTranscription else {
+            latestError = transcriptionService.readinessErrorDescription
             return
         }
 
@@ -96,11 +96,11 @@ final class TranscriptionViewModel {
             }
 
             do {
-                // Step 1: Extract audio if needed
-                let audioURL = try await self.audioExtractionService.extractAudio(from: url)
-
-                // Step 2: Get duration
-                let duration = try await self.audioExtractionService.getDuration(of: url)
+                // Step 1: Extract audio and fetch container metadata in parallel.
+                async let extractedAudio = self.audioExtractionService.extractAudio(from: url)
+                async let mediaDuration = self.audioExtractionService.getDuration(of: url)
+                let audioURL = try await extractedAudio
+                let duration = try await mediaDuration
 
                 // Step 3: Transcribe
                 self.updateJob(jobID, state: .transcribing(0))
@@ -173,6 +173,7 @@ final class TranscriptionViewModel {
 
             do {
                 let audioURL: URL?
+                let diarizationAudioURL: URL?
                 let duration: TimeInterval
                 let title: String
                 var segments: [TranscriptionSegment]
@@ -195,6 +196,7 @@ final class TranscriptionViewModel {
                     segments = captions.segments
                     fullText = captions.fullText
                     audioURL = nil
+                    diarizationAudioURL = nil
                 case .withAudioPlayback:
                     let progressTask = Task {
                         while !Task.isCancelled {
@@ -228,30 +230,46 @@ final class TranscriptionViewModel {
 
                     title = downloadedTitle.isEmpty ? "YouTube Video" : downloadedTitle
 
-                    // Step 2: Re-export through AVFoundation to normalize the audio format
-                    self.updateJob(jobID, state: .extractingAudio)
-                    let normalizedAudioURL = try await self.audioExtractionService.reExportAudio(from: rawAudioURL)
-                    try? FileManager.default.removeItem(at: rawAudioURL)
-                    audioURL = normalizedAudioURL
+                    let shouldNormalizeForDiarization = self.diarizationService.modelState.isReady
+                    let normalizedAudioTask: Task<URL, Error>? = shouldNormalizeForDiarization
+                        ? Task { try await self.audioExtractionService.reExportAudio(from: rawAudioURL) }
+                        : nil
+                    var normalizedAudioURL: URL?
+                    defer {
+                        normalizedAudioTask?.cancel()
+                        try? FileManager.default.removeItem(at: rawAudioURL)
+                        if let normalizedAudioURL {
+                            try? FileManager.default.removeItem(at: normalizedAudioURL)
+                        }
+                    }
 
-                    // Step 3: Get duration
-                    duration = try await self.audioExtractionService.getDuration(of: normalizedAudioURL)
+                    async let rawDuration = self.audioExtractionService.getDuration(of: rawAudioURL)
+                    audioURL = rawAudioURL
+                    duration = try await rawDuration
 
                     if let captions = await captionResult {
                         segments = captions.segments
                         fullText = captions.fullText
                     } else {
-                        guard self.transcriptionService.modelState.isReady else {
-                            self.removeJob(jobID)
-                            self.latestError = "No captions available and Whisper model is not loaded. Please load a model in Settings first."
-                            try? FileManager.default.removeItem(at: normalizedAudioURL)
-                            return
+                        guard self.transcriptionService.isReadyForTranscription else {
+                            throw NSError(
+                                domain: "YouTubeImport",
+                                code: 2,
+                                userInfo: [
+                                    NSLocalizedDescriptionKey: self.transcriptionService.readinessErrorDescription
+                                ]
+                            )
                         }
                         self.updateJob(jobID, state: .transcribing(0))
-                        let result = try await self.transcriptionService.transcribe(audioPath: normalizedAudioURL.path)
+                        let result = try await self.transcriptionService.transcribe(audioPath: rawAudioURL.path)
                         segments = result.segments
                         fullText = result.fullText
                     }
+
+                    if shouldNormalizeForDiarization {
+                        normalizedAudioURL = try await normalizedAudioTask?.value
+                    }
+                    diarizationAudioURL = normalizedAudioURL
                 }
 
                 if let idx = self.importJobs.firstIndex(where: { $0.id == jobID }) {
@@ -259,9 +277,10 @@ final class TranscriptionViewModel {
                 }
 
                 // Step 5: Speaker diarization
-                if let audioURL, self.diarizationService.modelState.isReady {
+                if let diarizationURL = diarizationAudioURL ?? audioURL,
+                   self.diarizationService.modelState.isReady {
                     self.updateJob(jobID, state: .diarizing)
-                    let speakerSegments = try await self.diarizationService.diarize(audioPath: audioURL.path)
+                    let speakerSegments = try await self.diarizationService.diarize(audioPath: diarizationURL.path)
                     if !speakerSegments.isEmpty {
                         segments = Self.assignSpeakerLabels(
                             segments: segments,

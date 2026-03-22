@@ -1,7 +1,8 @@
 import SwiftUI
 
 struct ModelLoadingOverlay: View {
-    let whisperState: TranscriptionService.ModelState
+    let transcriptionBackend: TranscriptionService.Backend
+    let transcriptionState: TranscriptionService.ModelState
     let llmState: LLMService.ModelState
     var diarizationState: DiarizationService.ModelState = .notLoaded
 
@@ -20,12 +21,12 @@ struct ModelLoadingOverlay: View {
                 VStack(spacing: 16) {
                     ModelRow(
                         icon: "waveform",
-                        name: "Whisper",
-                        detail: whisperDetail,
-                        progress: whisperProgress,
-                        isLoading: whisperIsLoading,
-                        isDone: whisperState.isReady,
-                        isError: whisperIsError
+                        name: transcriptionBackend.title,
+                        detail: transcriptionDetail,
+                        progress: transcriptionProgress,
+                        isLoading: transcriptionIsLoading,
+                        isDone: transcriptionState.isReady,
+                        isError: transcriptionIsError
                     )
 
                     ModelRow(
@@ -85,35 +86,35 @@ struct ModelLoadingOverlay: View {
         return m > 0 ? String(format: "%d:%02d", m, s) : "\(s)s"
     }
 
-    // MARK: - Whisper helpers
+    // MARK: - Transcription helpers
 
-    private var whisperDetail: String {
-        switch whisperState {
+    private var transcriptionDetail: String {
+        switch transcriptionState {
         case .notLoaded: return "Waiting..."
         case .downloading(let p): return "Downloading \(Int(p * 100))%"
         case .loading:
-            if elapsedSeconds >= 15 {
+            if transcriptionBackend == .whisperKit, elapsedSeconds >= 15 {
                 return "Specializing for your Mac. First load can take a while."
             }
-            return "Loading into memory..."
+            return transcriptionBackend == .appleSpeech ? "Preparing speech assets..." : "Loading into memory..."
         case .loaded(let m): return shortModelName(m)
         case .error(let e): return e
         }
     }
 
-    private var whisperProgress: Double? {
-        if case .downloading(let p) = whisperState { return p }
+    private var transcriptionProgress: Double? {
+        if case .downloading(let p) = transcriptionState { return p }
         return nil
     }
 
-    private var whisperIsLoading: Bool {
-        if case .loading = whisperState { return true }
-        if case .downloading = whisperState { return true }
+    private var transcriptionIsLoading: Bool {
+        if case .loading = transcriptionState { return true }
+        if case .downloading = transcriptionState { return true }
         return false
     }
 
-    private var whisperIsError: Bool {
-        if case .error = whisperState { return true }
+    private var transcriptionIsError: Bool {
+        if case .error = transcriptionState { return true }
         return false
     }
 

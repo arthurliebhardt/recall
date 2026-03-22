@@ -4,18 +4,22 @@ struct SettingsView: View {
     @Environment(TranscriptionService.self) private var transcriptionService
     @Environment(LLMService.self) private var llmService
 
+    @State private var selectedBackend = TranscriptionService.defaultBackend
     @State private var selectedWhisperModel = TranscriptionService.defaultModel
+    @State private var selectedTranscriptionProfile = TranscriptionService.defaultPerformanceProfile
     @State private var selectedLLMModel = LLMService.defaultModelId
     @State private var availableWhisperModels: [String] = []
 
+    @AppStorage("transcriptionBackend") private var savedTranscriptionBackend = TranscriptionService.defaultBackend.rawValue
     @AppStorage("whisperModel") private var savedWhisperModel = TranscriptionService.defaultModel
+    @AppStorage("transcriptionPerformanceProfile") private var savedTranscriptionProfile = TranscriptionService.defaultPerformanceProfile.rawValue
     @AppStorage("llmModel") private var savedLLMModel = LLMService.defaultModelId
 
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
 
     var body: some View {
         TabView {
-            whisperSettings
+            transcriptionSettings
                 .tabItem {
                     Label("Transcription", systemImage: "waveform")
                 }
@@ -32,8 +36,15 @@ struct SettingsView: View {
         }
         .frame(width: 500, height: 350)
         .task {
+            let resolvedBackend = TranscriptionService.resolveBackend(savedTranscriptionBackend)
+            if savedTranscriptionBackend != resolvedBackend.rawValue {
+                savedTranscriptionBackend = resolvedBackend.rawValue
+            }
+            selectedBackend = resolvedBackend
+            await transcriptionService.setBackend(resolvedBackend)
             availableWhisperModels = await transcriptionService.fetchAvailableModels()
             selectedWhisperModel = savedWhisperModel
+            selectedTranscriptionProfile = TranscriptionService.resolvePerformanceProfile(savedTranscriptionProfile)
             let resolvedLLMModel = LLMService.resolvePersistedModelId(savedLLMModel)
             if savedLLMModel != resolvedLLMModel {
                 savedLLMModel = resolvedLLMModel
@@ -42,42 +53,125 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Whisper Settings
+    // MARK: - Transcription Settings
 
-    private var whisperSettings: some View {
+    private var transcriptionSettings: some View {
         Form {
-            Section("Whisper Model") {
-                Picker("Model", selection: $selectedWhisperModel) {
-                    ForEach(whisperModelOptions, id: \.self) { model in
-                        Text(model).tag(model)
+            Section("Backend") {
+                Picker("Engine", selection: $selectedBackend) {
+                    ForEach(transcriptionService.availableBackends) { backend in
+                        Text(backend.title).tag(backend)
+                    }
+                }
+                .onChange(of: selectedBackend) { _, newValue in
+                    savedTranscriptionBackend = newValue.rawValue
+                    Task {
+                        await transcriptionService.setBackend(newValue)
                     }
                 }
 
-                modelStateView(for: transcriptionService.modelState)
+                Text(selectedBackend.detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
 
-                HStack {
-                    Button("Load Model") {
-                        savedWhisperModel = selectedWhisperModel
-                        Task {
-                            await transcriptionService.loadModel(selectedWhisperModel)
+            if selectedBackend == .whisperKit {
+                Section("Whisper Model") {
+                    Picker("Model", selection: $selectedWhisperModel) {
+                        ForEach(whisperModelOptions, id: \.self) { model in
+                            Text(model).tag(model)
                         }
                     }
-                    .disabled(transcriptionService.modelState.isReady
-                              && transcriptionService.modelState.modelName == selectedWhisperModel)
 
-                    if transcriptionService.modelState.isReady {
-                        Button("Unload") {
-                            transcriptionService.unloadModel()
+                    modelStateView(for: transcriptionService.modelState)
+
+                    HStack {
+                        Button("Load Model") {
+                            savedWhisperModel = selectedWhisperModel
+                            Task {
+                                await transcriptionService.prepareSelectedBackend(whisperVariant: selectedWhisperModel)
+                            }
+                        }
+                        .disabled(transcriptionService.modelState.isReady
+                                  && transcriptionService.modelState.modelName == selectedWhisperModel)
+
+                        if transcriptionService.modelState.isReady {
+                            Button("Unload") {
+                                Task {
+                                    await transcriptionService.unloadSelectedBackend()
+                                }
+                            }
                         }
                     }
+                }
+
+                Section("Transcription Profile") {
+                    Picker("Profile", selection: $selectedTranscriptionProfile) {
+                        ForEach(TranscriptionService.PerformanceProfile.allCases) { profile in
+                            Text(profile.title).tag(profile)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .onChange(of: selectedTranscriptionProfile) { _, newValue in
+                        savedTranscriptionProfile = newValue.rawValue
+                    }
+
+                    Text(selectedTranscriptionProfile.detail)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    Text("Applies to new transcriptions only.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                Section("Apple Speech") {
+                    modelStateView(for: transcriptionService.modelState)
+
+                    HStack {
+                        Button("Prepare") {
+                            Task {
+                                await transcriptionService.prepareSelectedBackend(whisperVariant: selectedWhisperModel)
+                            }
+                        }
+                        .disabled(transcriptionService.modelState.isReady)
+
+                        if transcriptionService.modelState.isReady {
+                            Button("Release") {
+                                Task {
+                                    await transcriptionService.unloadSelectedBackend()
+                                }
+                            }
+                        }
+                    }
+
+                    Text("Apple Speech uses the current system locale and downloads speech assets only if they are missing.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Section("Transcription Profile") {
+                    Picker("Profile", selection: $selectedTranscriptionProfile) {
+                        ForEach(TranscriptionService.PerformanceProfile.allCases) { profile in
+                            Text(profile.title).tag(profile)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .onChange(of: selectedTranscriptionProfile) { _, newValue in
+                        savedTranscriptionProfile = newValue.rawValue
+                    }
+
+                    Text(selectedTranscriptionProfile.detail)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
 
             Section("Info") {
-                Text("WhisperKit runs transcription locally on your Mac using CoreML.")
+                Text(transcriptionInfoLine)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                Text("Larger models are more accurate but use more memory and take longer to load.")
+                Text(transcriptionSecondaryInfoLine)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -174,14 +268,14 @@ struct SettingsView: View {
     @ViewBuilder
     private func modelStateView<S: Equatable>(for state: S) -> some View {
         if let whisperState = state as? TranscriptionService.ModelState {
-            whisperModelStatus(whisperState)
+            transcriptionModelStatus(whisperState)
         } else if let llmState = state as? LLMService.ModelState {
             llmModelStatus(llmState)
         }
     }
 
     @ViewBuilder
-    private func whisperModelStatus(_ state: TranscriptionService.ModelState) -> some View {
+    private func transcriptionModelStatus(_ state: TranscriptionService.ModelState) -> some View {
         switch state {
         case .notLoaded:
             Label("Not loaded", systemImage: "circle")
@@ -203,6 +297,24 @@ struct SettingsView: View {
         case .error(let msg):
             Label(msg, systemImage: "xmark.circle.fill")
                 .foregroundStyle(.red)
+        }
+    }
+
+    private var transcriptionInfoLine: String {
+        switch selectedBackend {
+        case .appleSpeech:
+            return "Apple Speech runs fully on-device through the SpeechAnalyzer framework."
+        case .whisperKit:
+            return "WhisperKit runs transcription locally on your Mac using CoreML."
+        }
+    }
+
+    private var transcriptionSecondaryInfoLine: String {
+        switch selectedBackend {
+        case .appleSpeech:
+            return "Apple Speech is only available on supported Macs running macOS 26 or later."
+        case .whisperKit:
+            return "Larger Whisper models are more accurate but use more memory and take longer to load."
         }
     }
 
