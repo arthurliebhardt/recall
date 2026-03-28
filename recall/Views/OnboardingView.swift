@@ -17,6 +17,7 @@ struct OnboardingView: View {
     @State private var step = 0
     @State private var selectedBackend = TranscriptionService.defaultBackend
     @State private var selectedWhisperModel = TranscriptionService.defaultModel
+    @State private var selectedAppleLocalePreference = TranscriptionService.systemLocalePreferenceValue
     @State private var selectedTranscriptionProfile = TranscriptionService.defaultPerformanceProfile
     @State private var llmSelection: LLMSelection = .defaultModel
     @State private var customPickerSelection = ""
@@ -88,6 +89,8 @@ struct OnboardingView: View {
                 savedTranscriptionBackend = resolvedBackend.rawValue
             }
             selectedBackend = resolvedBackend
+            await transcriptionService.refreshAppleLocaleInventory()
+            selectedAppleLocalePreference = transcriptionService.appleLocalePreference
             let models = await transcriptionService.fetchAvailableModels()
             if !models.isEmpty {
                 availableWhisperModels = models
@@ -149,21 +152,44 @@ struct OnboardingView: View {
                 .pickerStyle(.segmented)
                 .onChange(of: selectedBackend) { _, newValue in
                     savedTranscriptionBackend = newValue.rawValue
+                    Task {
+                        await transcriptionService.setBackend(newValue)
+                        selectedAppleLocalePreference = transcriptionService.appleLocalePreference
+                    }
                 }
             }
 
             if selectedBackend == .whisperKit {
                 Picker("Model", selection: $selectedWhisperModel) {
                     ForEach(whisperModelOptions, id: \.self) { model in
-                        Text(model).tag(model)
+                        Text(whisperModelLabel(for: model)).tag(model)
                     }
                 }
                 .labelsHidden()
+
+                Text("Use a multilingual Whisper model for German and other non-English transcripts. `tiny.en` is English-only.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             } else {
                 VStack(alignment: .leading, spacing: 8) {
-                    Label("Apple Speech uses your current system language.", systemImage: "globe")
+                    Picker("Language", selection: $selectedAppleLocalePreference) {
+                        Text(systemAppleLocaleLabel).tag(TranscriptionService.systemLocalePreferenceValue)
+
+                        ForEach(transcriptionService.availableAppleLocales, id: \.identifier) { locale in
+                            Text(appleLocaleLabel(for: locale)).tag(locale.identifier)
+                        }
+                    }
+                    .onChange(of: selectedAppleLocalePreference) { _, newValue in
+                        Task {
+                            await transcriptionService.setAppleLocalePreference(newValue)
+                            selectedAppleLocalePreference = transcriptionService.appleLocalePreference
+                        }
+                    }
+
+                    Label("Apple Speech uses one locale per transcriber.", systemImage: "globe")
                         .font(.callout)
-                    Text("Speech assets will be downloaded automatically if this Mac doesn't have them yet.")
+                    Text(appleLocaleSecondaryInfoLine)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -350,13 +376,49 @@ struct OnboardingView: View {
 
     private var whisperModelOptions: [String] {
         if availableWhisperModels.isEmpty {
-            return [TranscriptionService.defaultModel, "openai_whisper-large-v3_turbo", "large-v3", "tiny.en"]
+            return [TranscriptionService.defaultModel, "openai_whisper-large-v3_turbo", "large-v3"]
         }
         var models = availableWhisperModels
         if !models.contains(selectedWhisperModel) {
             models.insert(selectedWhisperModel, at: 0)
         }
         return models
+    }
+
+    private func whisperModelLabel(for model: String) -> String {
+        model == "tiny.en" ? "\(model) (English only)" : model
+    }
+
+    private func appleLocaleLabel(for locale: Locale) -> String {
+        let name = TranscriptionService.displayName(for: locale)
+        if transcriptionService.installedAppleLocaleIdentifiers.contains(locale.identifier) {
+            return "\(name) (downloaded)"
+        }
+        return name
+    }
+
+    private var systemAppleLocaleLabel: String {
+        let base = "Use macOS Language"
+        guard let resolvedIdentifier = transcriptionService.resolvedAppleLocaleIdentifier else {
+            return base
+        }
+
+        let locale = Locale(identifier: resolvedIdentifier)
+        return "\(base) (\(TranscriptionService.displayName(for: locale)))"
+    }
+
+    private var appleLocaleSecondaryInfoLine: String {
+        let resolvedIdentifier = transcriptionService.resolvedAppleLocaleIdentifier ?? selectedAppleLocalePreference
+        guard resolvedIdentifier != TranscriptionService.systemLocalePreferenceValue else {
+            return "This follows your current macOS language and region. Apple Speech does not auto-detect the spoken language from audio. Assets download automatically when needed."
+        }
+
+        let locale = Locale(identifier: resolvedIdentifier)
+        let prefix = "Selected locale: \(TranscriptionService.displayName(for: locale))."
+        if transcriptionService.installedAppleLocaleIdentifiers.contains(resolvedIdentifier) {
+            return "\(prefix) Speech assets are already installed on this Mac. Apple Speech does not auto-detect the spoken language from audio."
+        }
+        return "\(prefix) Speech assets will download automatically when needed. Apple Speech does not auto-detect the spoken language from audio."
     }
 
     private func shortModelName(_ name: String) -> String {

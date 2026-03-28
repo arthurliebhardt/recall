@@ -6,6 +6,7 @@ struct SettingsView: View {
 
     @State private var selectedBackend = TranscriptionService.defaultBackend
     @State private var selectedWhisperModel = TranscriptionService.defaultModel
+    @State private var selectedAppleLocalePreference = TranscriptionService.systemLocalePreferenceValue
     @State private var selectedTranscriptionProfile = TranscriptionService.defaultPerformanceProfile
     @State private var selectedLLMModel = LLMService.defaultModelId
     @State private var availableWhisperModels: [String] = []
@@ -42,8 +43,10 @@ struct SettingsView: View {
             }
             selectedBackend = resolvedBackend
             await transcriptionService.setBackend(resolvedBackend)
+            await transcriptionService.refreshAppleLocaleInventory()
             availableWhisperModels = await transcriptionService.fetchAvailableModels()
             selectedWhisperModel = savedWhisperModel
+            selectedAppleLocalePreference = transcriptionService.appleLocalePreference
             selectedTranscriptionProfile = TranscriptionService.resolvePerformanceProfile(savedTranscriptionProfile)
             let resolvedLLMModel = LLMService.resolvePersistedModelId(savedLLMModel)
             if savedLLMModel != resolvedLLMModel {
@@ -67,6 +70,7 @@ struct SettingsView: View {
                     savedTranscriptionBackend = newValue.rawValue
                     Task {
                         await transcriptionService.setBackend(newValue)
+                        selectedAppleLocalePreference = transcriptionService.appleLocalePreference
                     }
                 }
 
@@ -79,7 +83,7 @@ struct SettingsView: View {
                 Section("Whisper Model") {
                     Picker("Model", selection: $selectedWhisperModel) {
                         ForEach(whisperModelOptions, id: \.self) { model in
-                            Text(model).tag(model)
+                            Text(whisperModelLabel(for: model)).tag(model)
                         }
                     }
 
@@ -103,6 +107,10 @@ struct SettingsView: View {
                             }
                         }
                     }
+
+                    Text("Use a multilingual Whisper model for German and other non-English transcripts. `tiny.en` is English-only.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
 
                 Section("Transcription Profile") {
@@ -126,6 +134,20 @@ struct SettingsView: View {
                 }
             } else {
                 Section("Apple Speech") {
+                    Picker("Language", selection: $selectedAppleLocalePreference) {
+                        Text(systemAppleLocaleLabel).tag(TranscriptionService.systemLocalePreferenceValue)
+
+                        ForEach(transcriptionService.availableAppleLocales, id: \.identifier) { locale in
+                            Text(appleLocaleLabel(for: locale)).tag(locale.identifier)
+                        }
+                    }
+                    .onChange(of: selectedAppleLocalePreference) { _, newValue in
+                        Task {
+                            await transcriptionService.setAppleLocalePreference(newValue)
+                            selectedAppleLocalePreference = transcriptionService.appleLocalePreference
+                        }
+                    }
+
                     modelStateView(for: transcriptionService.modelState)
 
                     HStack {
@@ -145,7 +167,11 @@ struct SettingsView: View {
                         }
                     }
 
-                    Text("Apple Speech uses the current system locale and downloads speech assets only if they are missing.")
+                    Text("Apple Speech uses one locale per transcriber. Choose a supported language and the system downloads assets only if they are missing.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    Text(appleLocaleSecondaryInfoLine)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -253,7 +279,7 @@ struct SettingsView: View {
 
     private var whisperModelOptions: [String] {
         if availableWhisperModels.isEmpty {
-            return [TranscriptionService.defaultModel, "openai_whisper-large-v3_turbo", "large-v3", "tiny.en"]
+            return [TranscriptionService.defaultModel, "openai_whisper-large-v3_turbo", "large-v3"]
         }
         // Ensure the selected model is always in the list
         var models = availableWhisperModels
@@ -261,6 +287,42 @@ struct SettingsView: View {
             models.insert(selectedWhisperModel, at: 0)
         }
         return models
+    }
+
+    private func whisperModelLabel(for model: String) -> String {
+        model == "tiny.en" ? "\(model) (English only)" : model
+    }
+
+    private func appleLocaleLabel(for locale: Locale) -> String {
+        let name = TranscriptionService.displayName(for: locale)
+        if transcriptionService.installedAppleLocaleIdentifiers.contains(locale.identifier) {
+            return "\(name) (downloaded)"
+        }
+        return name
+    }
+
+    private var systemAppleLocaleLabel: String {
+        let base = "Use macOS Language"
+        guard let resolvedIdentifier = transcriptionService.resolvedAppleLocaleIdentifier else {
+            return base
+        }
+
+        let locale = Locale(identifier: resolvedIdentifier)
+        return "\(base) (\(TranscriptionService.displayName(for: locale)))"
+    }
+
+    private var appleLocaleSecondaryInfoLine: String {
+        let resolvedIdentifier = transcriptionService.resolvedAppleLocaleIdentifier ?? selectedAppleLocalePreference
+        guard resolvedIdentifier != TranscriptionService.systemLocalePreferenceValue else {
+            return "This follows your current macOS language and region. Apple Speech does not auto-detect the spoken language from audio."
+        }
+
+        let locale = Locale(identifier: resolvedIdentifier)
+        let prefix = "Selected locale: \(TranscriptionService.displayName(for: locale))."
+        if transcriptionService.installedAppleLocaleIdentifiers.contains(resolvedIdentifier) {
+            return "\(prefix) Speech assets are already installed on this Mac. Apple Speech does not auto-detect the spoken language from audio."
+        }
+        return "\(prefix) Speech assets will download when you prepare this backend. Apple Speech does not auto-detect the spoken language from audio."
     }
 
     // MARK: - Helpers

@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleName</key>
-    <string>recall.</string>
+    <string>recall</string>
     <key>CFBundleDisplayName</key>
-    <string>recall.</string>
+    <string>recall</string>
     <key>CFBundleIdentifier</key>
     <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
     <key>CFBundleVersion</key>
@@ -20,6 +20,8 @@
     <string>AppIcon</string>
     <key>LSMinimumSystemVersion</key>
     <string>$(MACOSX_DEPLOYMENT_TARGET)</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>recall uses the microphone to record meetings for local transcription.</string>
     <key>CFBundleDocumentTypes</key>
     <array>
         <dict>

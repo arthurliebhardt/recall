@@ -47,7 +47,15 @@ final class TranscriptionViewModel {
         var task: Task<Void, Never>?
     }
 
+    struct PendingRecording: Identifiable, Equatable {
+        let recording: RecordingService.CompletedRecording
+        var appleLocalePreference: String
+
+        var id: UUID { recording.id }
+    }
+
     private(set) var importJobs: [ImportJob] = []
+    private(set) var pendingRecordings: [PendingRecording] = []
     var latestError: String?
     var selectedRecord: TranscriptionRecord?
 
@@ -67,6 +75,47 @@ final class TranscriptionViewModel {
 
     var isImporting: Bool {
         !importJobs.isEmpty
+    }
+
+    func enqueueCompletedRecording(_ recording: RecordingService.CompletedRecording) {
+        pendingRecordings.insert(
+            PendingRecording(
+                recording: recording,
+                appleLocalePreference: transcriptionService.appleLocalePreference
+            ),
+            at: 0
+        )
+    }
+
+    func setPendingRecordingAppleLocale(_ preference: String, for id: UUID) {
+        guard let index = pendingRecordings.firstIndex(where: { $0.id == id }) else { return }
+        pendingRecordings[index].appleLocalePreference = preference
+    }
+
+    func transcribePendingRecording(_ id: UUID, modelContext: ModelContext) {
+        guard let index = pendingRecordings.firstIndex(where: { $0.id == id }) else { return }
+        let pending = pendingRecordings.remove(at: index)
+
+        Task { [weak self] in
+            guard let self else { return }
+
+            if self.transcriptionService.selectedBackend == .appleSpeech {
+                await self.transcriptionService.setAppleLocalePreference(pending.appleLocalePreference)
+            }
+
+            if !self.transcriptionService.isReadyForTranscription {
+                let whisperVariant = UserDefaults.standard.string(forKey: "whisperModel")
+                    ?? TranscriptionService.defaultModel
+                await self.transcriptionService.prepareSelectedBackend(whisperVariant: whisperVariant)
+            }
+
+            if self.transcriptionService.isReadyForTranscription {
+                self.importFile(pending.recording.url, modelContext: modelContext)
+            } else {
+                self.latestError = self.transcriptionService.readinessErrorDescription
+                self.pendingRecordings.insert(pending, at: index)
+            }
+        }
     }
 
     /// Import a file: validate → extract audio (if video) → transcribe → save

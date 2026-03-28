@@ -5,13 +5,16 @@ struct ContentView: View {
     @Environment(TranscriptionViewModel.self) private var transcriptionVM
     @Environment(ChatViewModel.self) private var chatVM
     @Environment(TranscriptionService.self) private var transcriptionService
+    @Environment(RecordingService.self) private var recordingService
     @Environment(LLMService.self) private var llmService
     @Environment(DiarizationService.self) private var diarizationService
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.openURL) private var openURL
 
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @AppStorage("transcriptionBackend") private var savedTranscriptionBackend = TranscriptionService.defaultBackend.rawValue
     @AppStorage("whisperModel") private var savedWhisperModel = TranscriptionService.defaultModel
+    @AppStorage("appleSpeechLocalePreference") private var savedAppleSpeechLocalePreference = TranscriptionService.systemLocalePreferenceValue
     @AppStorage("llmModel") private var savedLLMModel = LLMService.defaultModelId
 
     @State private var showFileImporter = false
@@ -91,17 +94,21 @@ struct ContentView: View {
             }
         }
         .alert(
-            "Import Error",
-            isPresented: Binding(
-                get: { transcriptionVM.latestError != nil },
-                set: { if !$0 { transcriptionVM.clearError() } }
-            )
+            activeAlert.title,
+            isPresented: alertPresentedBinding
         ) {
-            Button("OK") { transcriptionVM.clearError() }
-        } message: {
-            if let msg = transcriptionVM.latestError {
-                Text(msg)
+            if let settingsURL = activeAlert.settingsURL {
+                Button("Open Settings") {
+                    openURL(settingsURL)
+                    clearErrors()
+                }
             }
+
+            Button(activeAlert.dismissLabel) {
+                clearErrors()
+            }
+        } message: {
+            Text(activeAlert.message)
         }
         .overlay {
             if !hasCompletedOnboarding {
@@ -128,6 +135,7 @@ struct ContentView: View {
                 savedTranscriptionBackend = resolvedBackend.rawValue
             }
             await transcriptionService.setBackend(resolvedBackend)
+            await transcriptionService.setAppleLocalePreference(savedAppleSpeechLocalePreference)
 
             let resolvedLLMModel = LLMService.resolvePersistedModelId(savedLLMModel)
             if savedLLMModel != resolvedLLMModel {
@@ -161,8 +169,65 @@ struct ContentView: View {
             hasCompletedOnboarding ? "1" : "0",
             savedTranscriptionBackend,
             savedWhisperModel,
+            savedAppleSpeechLocalePreference,
             savedLLMModel,
         ].joined(separator: "|")
+    }
+
+    private var alertPresentedBinding: Binding<Bool> {
+        Binding(
+            get: { transcriptionVM.latestError != nil || recordingService.latestError != nil },
+            set: { isPresented in
+                if !isPresented {
+                    clearErrors()
+                }
+            }
+        )
+    }
+
+    private var activeAlert: AppAlert {
+        if let recordingError = recordingService.latestError {
+            if recordingError == RecordingService.RecordingError.screenCapturePermissionDenied.localizedDescription {
+                return AppAlert(
+                    title: "Screen Recording Access Needed",
+                    message: """
+                    To record your screen or a specific window:
+
+                    1. Open System Settings.
+                    2. Go to Privacy & Security > Screen Recording.
+                    3. Enable access for recall.
+                    4. Quit and reopen recall if macOS asks you to.
+                    """,
+                    dismissLabel: "Not Now",
+                    settingsURL: URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")
+                )
+            }
+
+            if recordingError == RecordingService.RecordingError.microphoneAccessDenied.localizedDescription {
+                return AppAlert(
+                    title: "Microphone Access Needed",
+                    message: """
+                    To record audio:
+
+                    1. Open System Settings.
+                    2. Go to Privacy & Security > Microphone.
+                    3. Enable access for recall.
+                    4. Return to recall and try again.
+                    """,
+                    dismissLabel: "Not Now",
+                    settingsURL: URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")
+                )
+            }
+
+            return AppAlert(title: "Error", message: recordingError)
+        }
+
+        return AppAlert(title: "Error", message: transcriptionVM.latestError ?? "Something went wrong.")
+    }
+
+    private func clearErrors() {
+        transcriptionVM.clearError()
+        recordingService.clearError()
     }
 
     private func handleDrop(_ providers: [NSItemProvider]) {
@@ -175,5 +240,19 @@ struct ContentView: View {
                 }
             }
         }
+    }
+}
+
+private struct AppAlert {
+    let title: String
+    let message: String
+    let dismissLabel: String
+    let settingsURL: URL?
+
+    init(title: String, message: String, dismissLabel: String = "OK", settingsURL: URL? = nil) {
+        self.title = title
+        self.message = message
+        self.dismissLabel = dismissLabel
+        self.settingsURL = settingsURL
     }
 }

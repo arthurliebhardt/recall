@@ -12,6 +12,7 @@ It combines WhisperKit for transcription, FluidAudio for speaker diarization, an
 - Synced playback with transcript scrubbing and timestamp seek
 - Import from local audio and video files
 - Import from YouTube URLs, with caption fast-path when available
+- Record audio, the current screen, or a specific window directly in the app and transcribe it automatically on stop
 - Persistent transcript and chat history with SwiftData
 - Cached model reuse so existing Whisper and MLX downloads are picked up automatically
 
@@ -101,6 +102,14 @@ The default LLM is `Qwen3-4B-4bit`, which is the safest choice for most Macs. If
 2. Choose `From File`.
 3. Pick an audio or video file.
 
+### Record a meeting
+
+1. Click the `Record` button in the sidebar toolbar.
+2. Choose `Record Audio`, `Record Current Screen`, or `Record Window`.
+3. Click `Stop` when the meeting ends.
+
+The recording is saved in the app's Documents folder under `Recall Recordings` and is imported for transcription automatically.
+
 ### Import from YouTube
 
 1. Click the `+` button in the sidebar.
@@ -153,6 +162,7 @@ Important storage locations:
   `~/Library/Application Support/default.store`
 
 Imported media is copied into the app sandbox so playback keeps working after import.
+Recordings created inside the app are saved under the sandboxed Documents directory in `Recall Recordings`.
 
 ## Tech Stack
 

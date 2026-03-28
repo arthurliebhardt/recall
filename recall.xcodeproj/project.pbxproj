@@ -23,6 +23,7 @@
 		3CD9D2A7C32C5414A1BE4E1D /* AudioExtractionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A6F6FE6881EF57F7D7613ED /* AudioExtractionService.swift */; };
 		3F3841867B6A834F4FF5576B /* LLMService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83B88EEB17568271EC883FCC /* LLMService.swift */; };
 		4D7A2A08D6191410E1B415DF /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDC3D6FDED787F69F4727707 /* SidebarView.swift */; };
+		A7B8C9D0E1F2031425364758 /* RecordingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7B8C9D0E1F2031425364759 /* RecordingService.swift */; };
 		4ED3B6E82A3E8CBEEC934838 /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = D0FA97091B54FD84013E6350 /* WhisperKit */; };
 		7780E221D511CF6FE483DBB0 /* AudioPlayerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F311966E66774BAD583C86BF /* AudioPlayerService.swift */; };
 		8AA4926954D243F6449E8F75 /* TranscriptionDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1577D716B63107EA8F2DCCAD /* TranscriptionDetailView.swift */; };
@@ -57,6 +58,7 @@
 		83B88EEB17568271EC883FCC /* LLMService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMService.swift; sourceTree = "<group>"; };
 		853947397ACEFB01F1F0E8F2 /* ChatMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatMessage.swift; sourceTree = "<group>"; };
 		8C23A073C662E1CB782D2348 /* TranscriptionViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionViewModel.swift; sourceTree = "<group>"; };
+		A7B8C9D0E1F2031425364759 /* RecordingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingService.swift; sourceTree = "<group>"; };
 		D2A3B37F05B2374E5BD631DC /* TranscriptionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionService.swift; sourceTree = "<group>"; };
 		D4C616898C25B49473567D34 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		E7AAA636C707B41852ED1DE3 /* ChatBubbleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatBubbleView.swift; sourceTree = "<group>"; };
@@ -165,6 +167,7 @@
 				E7C0EEA98636685C828658E5 /* DiarizationService.swift */,
 				83B88EEB17568271EC883FCC /* LLMService.swift */,
 				B6A7C8D9E0F1121314151618 /* MLXMetalBootstrap.swift */,
+				A7B8C9D0E1F2031425364759 /* RecordingService.swift */,
 				D2A3B37F05B2374E5BD631DC /* TranscriptionService.swift */,
 				A1B2C3D4E5F60718293041AB /* YouTubeCaptionService.swift */,
 				0E5E49B6B994EE18E6D163F2 /* YouTubeService.swift */,
@@ -288,6 +291,7 @@
 				B6A7C8D9E0F1121314151617 /* MLXMetalBootstrap.swift in Sources */,
 				165E7D81129E425B93A8501D /* ModelLoadingOverlay.swift in Sources */,
 				A2B3C4D5E6F7081930415263 /* OnboardingView.swift in Sources */,
+				A7B8C9D0E1F2031425364758 /* RecordingService.swift in Sources */,
 				EDCD1FA8C8504307469199D7 /* SettingsView.swift in Sources */,
 				4D7A2A08D6191410E1B415DF /* SidebarView.swift in Sources */,
 				9C862F0A112BF4FB78FE8999 /* RecallApp.swift in Sources */,
@@ -362,7 +366,7 @@
 		71E0D8F2392B7A9C48641D91 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = recall/SummarizeContent.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -447,7 +451,7 @@
 		F757C5297C72FF97F1C3D7E5 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = recall/SummarizeContent.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;

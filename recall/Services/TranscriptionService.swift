@@ -112,6 +112,8 @@ final class TranscriptionService {
     nonisolated static let defaultModel = WhisperKit.recommendedModels().default
     nonisolated static let defaultPerformanceProfile: PerformanceProfile = .fast
     private static let backendDefaultsKey = "transcriptionBackend"
+    nonisolated static let systemLocalePreferenceValue = "__system__"
+    private static let appleLocalePreferenceDefaultsKey = "appleSpeechLocalePreference"
     private static let performanceProfileDefaultsKey = "transcriptionPerformanceProfile"
     private static var huggingFaceCacheDirectory: URL {
         let cachesDirectory = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
@@ -129,6 +131,10 @@ final class TranscriptionService {
     private(set) var modelState: ModelState
     private(set) var transcriptionProgress: Double = 0
     private(set) var isTranscribing = false
+    private(set) var appleLocalePreference: String
+    private(set) var availableAppleLocales: [Locale] = []
+    private(set) var installedAppleLocaleIdentifiers: Set<String> = []
+    private(set) var resolvedAppleLocaleIdentifier: String?
 
     private var whisperModelState: ModelState = .notLoaded
     private var appleModelState: ModelState = .notLoaded
@@ -138,7 +144,11 @@ final class TranscriptionService {
 
     init() {
         let backend = Self.resolveBackend(UserDefaults.standard.string(forKey: Self.backendDefaultsKey))
+        let localePreference = Self.resolveAppleLocalePreference(
+            UserDefaults.standard.string(forKey: Self.appleLocalePreferenceDefaultsKey)
+        )
         self.selectedBackend = backend
+        self.appleLocalePreference = localePreference
         self.modelState = .notLoaded
         self.modelState = state(for: backend)
     }
@@ -188,6 +198,12 @@ final class TranscriptionService {
         return backend
     }
 
+    nonisolated static func resolveAppleLocalePreference(_ rawValue: String?) -> String {
+        guard let rawValue else { return systemLocalePreferenceValue }
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? systemLocalePreferenceValue : trimmed
+    }
+
     nonisolated static func isBackendSupported(_ backend: Backend) -> Bool {
         switch backend {
         case .whisperKit:
@@ -207,6 +223,9 @@ final class TranscriptionService {
     func setBackend(_ backend: Backend) async {
         let resolvedBackend = Self.isBackendSupported(backend) ? backend : .whisperKit
         guard resolvedBackend != selectedBackend else {
+            if resolvedBackend == .appleSpeech {
+                await refreshAppleLocaleInventory()
+            }
             syncActiveState()
             return
         }
@@ -219,7 +238,61 @@ final class TranscriptionService {
 
         selectedBackend = resolvedBackend
         UserDefaults.standard.set(resolvedBackend.rawValue, forKey: Self.backendDefaultsKey)
+        if resolvedBackend == .appleSpeech {
+            await refreshAppleLocaleInventory()
+        }
         syncActiveState()
+    }
+
+    func setAppleLocalePreference(_ preference: String) async {
+        let resolvedPreference = Self.resolveAppleLocalePreference(preference)
+        guard resolvedPreference != appleLocalePreference else {
+            await refreshAppleLocaleInventory()
+            return
+        }
+
+        if preparedAppleLocaleIdentifier != nil || reservedAppleLocaleIdentifier != nil {
+            appleModelState = .notLoaded
+            preparedAppleLocaleIdentifier = nil
+            await releaseAppleLocaleReservation()
+        }
+
+        appleLocalePreference = resolvedPreference
+        UserDefaults.standard.set(resolvedPreference, forKey: Self.appleLocalePreferenceDefaultsKey)
+        await refreshAppleLocaleInventory()
+        syncActiveState()
+    }
+
+    func refreshAppleLocaleInventory() async {
+#if canImport(Speech)
+        guard #available(macOS 26.0, *) else {
+            availableAppleLocales = []
+            installedAppleLocaleIdentifiers = []
+            resolvedAppleLocaleIdentifier = nil
+            return
+        }
+
+        guard SpeechTranscriber.isAvailable else {
+            availableAppleLocales = []
+            installedAppleLocaleIdentifiers = []
+            resolvedAppleLocaleIdentifier = nil
+            return
+        }
+
+        let supportedLocales = await SpeechTranscriber.supportedLocales
+            .sorted { Self.displayName(for: $0).localizedCaseInsensitiveCompare(Self.displayName(for: $1)) == .orderedAscending }
+        let installedLocales = await SpeechTranscriber.installedLocales
+
+        availableAppleLocales = supportedLocales
+        installedAppleLocaleIdentifiers = Set(installedLocales.map(\.identifier))
+
+        await normalizeAppleLocalePreference(using: supportedLocales)
+        resolvedAppleLocaleIdentifier = (try? await supportedAppleLocale())?.identifier
+#else
+        availableAppleLocales = []
+        installedAppleLocaleIdentifiers = []
+        resolvedAppleLocaleIdentifier = nil
+#endif
     }
 
     func prepareSelectedBackend(whisperVariant: String = defaultModel) async {
@@ -405,6 +478,7 @@ final class TranscriptionService {
             temperatureFallbackCount: profile.temperatureFallbackCount,
             usePrefillPrompt: true,              // Skip predicting task/language tokens
             usePrefillCache: true,               // Pre-populate KV cache
+            detectLanguage: true,                // Keep multilingual audio in its source language
             skipSpecialTokens: true,             // Clean output, no <|tokens|>
             wordTimestamps: true,                // Word-level timestamps for highlighting
             suppressBlank: true,                 // Skip blank segments
@@ -628,12 +702,35 @@ final class TranscriptionService {
 
     @available(macOS 26.0, *)
     private func supportedAppleLocale() async throws -> Locale {
-        guard let locale = await SpeechTranscriber.supportedLocale(equivalentTo: .autoupdatingCurrent) else {
-            throw TranscriptionError.unsupportedLocale(
-                "Apple Speech does not support \(Self.displayName(for: .autoupdatingCurrent)) on this Mac."
-            )
+        let requestedLocale: Locale
+        if appleLocalePreference == Self.systemLocalePreferenceValue {
+            requestedLocale = .autoupdatingCurrent
+        } else {
+            requestedLocale = Locale(identifier: appleLocalePreference)
+        }
+
+        guard let locale = await SpeechTranscriber.supportedLocale(equivalentTo: requestedLocale) else {
+            throw TranscriptionError.unsupportedLocale(Self.unsupportedAppleLocaleMessage(for: requestedLocale))
         }
         return locale
+    }
+
+    @available(macOS 26.0, *)
+    private func normalizeAppleLocalePreference(using supportedLocales: [Locale]) async {
+        guard appleLocalePreference != Self.systemLocalePreferenceValue else { return }
+
+        if supportedLocales.contains(where: { $0.identifier == appleLocalePreference }) {
+            return
+        }
+
+        let requestedLocale = Locale(identifier: appleLocalePreference)
+        if let equivalentLocale = await SpeechTranscriber.supportedLocale(equivalentTo: requestedLocale) {
+            appleLocalePreference = equivalentLocale.identifier
+        } else {
+            appleLocalePreference = Self.systemLocalePreferenceValue
+        }
+
+        UserDefaults.standard.set(appleLocalePreference, forKey: Self.appleLocalePreferenceDefaultsKey)
     }
 
     private func releaseAppleLocaleReservation() async {
@@ -718,8 +815,12 @@ final class TranscriptionService {
         "Apple Speech (\(displayName(for: locale)))"
     }
 
-    private static func displayName(for locale: Locale) -> String {
+    static func displayName(for locale: Locale) -> String {
         locale.localizedString(forIdentifier: locale.identifier) ?? locale.identifier
+    }
+
+    private static func unsupportedAppleLocaleMessage(for requestedLocale: Locale) -> String {
+        "Apple Speech does not support \(displayName(for: requestedLocale)) on this Mac."
     }
 #endif
 
